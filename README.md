@@ -16,8 +16,8 @@ A Heroku-deployable email plugin built using the OpenPlugin framework. This appl
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd OpenEmailDemo
+git clone https://github.com/VishwasK/openpluginemail.git
+cd openpluginemail
 ```
 
 2. Create a virtual environment:
