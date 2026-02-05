@@ -199,7 +199,12 @@ class StoryPlugin:
                     'error': 'OpenAI API key not provided'
                 }
             
-            client = OpenAI(api_key=api_key)
+            # Initialize OpenAI client with explicit parameters
+            client = OpenAI(
+                api_key=api_key,
+                timeout=60.0,
+                max_retries=2
+            )
             
             # Build the prompt
             system_prompt = "You are a creative writing assistant. Write engaging, well-structured stories based on user prompts."
@@ -267,7 +272,12 @@ class StoryPlugin:
                     'error': 'OpenAI API key not provided'
                 }
             
-            client = OpenAI(api_key=api_key)
+            # Initialize OpenAI client with explicit parameters
+            client = OpenAI(
+                api_key=api_key,
+                timeout=60.0,
+                max_retries=2
+            )
             
             system_prompt = "You are a creative writing assistant. Continue stories seamlessly, maintaining style, tone, and character consistency."
             user_prompt = f"Continue this story:\n\n{story}"
@@ -330,7 +340,12 @@ class StoryPlugin:
                     'error': 'OpenAI API key not provided'
                 }
             
-            client = OpenAI(api_key=api_key)
+            # Initialize OpenAI client with explicit parameters
+            client = OpenAI(
+                api_key=api_key,
+                timeout=60.0,
+                max_retries=2
+            )
             
             system_prompt = "You are an expert editor and writing coach. Improve stories by enhancing descriptions, dialogue, pacing, and overall writing quality while maintaining the original plot and characters."
             user_prompt = f"Improve this story:\n\n{story}"
