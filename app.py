@@ -4,7 +4,7 @@ Main application file for the email plugin service
 """
 
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import smtplib
 from email.mime.text import MIMEText
@@ -105,6 +105,12 @@ email_plugin = EmailPlugin()
 
 
 @app.route('/')
+def index():
+    """Main UI page"""
+    return render_template('index.html')
+
+
+@app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({

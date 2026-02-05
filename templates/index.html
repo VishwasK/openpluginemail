@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenPlugin Email Plugin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📧 OpenPlugin Email Plugin</h1>
+            <p class="subtitle">Send emails via SMTP with ease</p>
+        </header>
+
+        <div class="status-bar" id="statusBar">
+            <span class="status-indicator" id="statusIndicator"></span>
+            <span id="statusText">Checking status...</span>
+        </div>
+
+        <main>
+            <div class="card">
+                <h2>Send Email</h2>
+                <form id="emailForm">
+                    <div class="form-group">
+                        <label for="toEmail">To Email *</label>
+                        <input 
+                            type="email" 
+                            id="toEmail" 
+                            name="toEmail" 
+                            placeholder="recipient@example.com" 
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subject">Subject *</label>
+                        <input 
+                            type="text" 
+                            id="subject" 
+                            name="subject" 
+                            placeholder="Email subject" 
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="body">Message *</label>
+                        <textarea 
+                            id="body" 
+                            name="body" 
+                            rows="6" 
+                            placeholder="Enter your message here..." 
+                            required
+                        ></textarea>
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="isHtml" name="isHtml">
+                            Send as HTML
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="sendBtn">
+                        <span class="btn-text">Send Email</span>
+                        <span class="btn-loader" style="display: none;">Sending...</span>
+                    </button>
+                </form>
+
+                <div id="resultMessage" class="result-message" style="display: none;"></div>
+            </div>
+
+            <div class="card">
+                <h2>Plugin Information</h2>
+                <div id="pluginInfo" class="plugin-info">
+                    <p>Loading plugin information...</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>API Endpoints</h2>
+                <div class="endpoints-list">
+                    <div class="endpoint">
+                        <span class="method get">GET</span>
+                        <code>/</code>
+                        <span class="description">Health check</span>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method get">GET</span>
+                        <code>/api/email/info</code>
+                        <span class="description">Plugin information</span>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method post">POST</span>
+                        <code>/api/email/send</code>
+                        <span class="description">Send email</span>
+                    </div>
+                    <div class="endpoint">
+                        <span class="method get">GET</span>
+                        <code>/api/openplugin/manifest</code>
+                        <span class="description">OpenPlugin manifest</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>OpenPlugin Email Plugin v1.0.0 | 
+                <a href="https://github.com/VishwasK/openpluginemail" target="_blank">GitHub</a>
+            </p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

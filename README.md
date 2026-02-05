@@ -4,11 +4,13 @@ A Heroku-deployable email plugin built using the OpenPlugin framework. This appl
 
 ## Features
 
+- **Modern Web UI** - Beautiful, responsive interface for sending emails
 - Send emails via SMTP
 - OpenPlugin-compatible API
 - OpenAPI specification
 - Health check endpoint
 - CORS enabled for cross-origin requests
+- Real-time status monitoring
 
 ## Setup
 
@@ -59,11 +61,19 @@ If using Gmail, you'll need to:
 2. Generate an App Password: https://myaccount.google.com/apppasswords
 3. Use the app password in `SMTP_PASSWORD`
 
+## Web Interface
+
+Visit the root URL (`/`) to access the web interface where you can:
+- Send emails through an intuitive form
+- View plugin information
+- See API endpoint documentation
+- Monitor service health status
+
 ## API Endpoints
 
 ### Health Check
 ```
-GET /
+GET /api/health
 ```
 Returns service health status.
 
