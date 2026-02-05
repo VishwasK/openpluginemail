@@ -289,6 +289,34 @@ header h1 {
     border: 1px solid var(--border-color);
 }
 
+.large-input {
+    min-height: 60px !important;
+    padding: 16px !important;
+    font-size: 1rem !important;
+}
+
+.toggle-password-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 8px;
+    opacity: 0.6;
+    transition: opacity 0.3s;
+}
+
+.toggle-password-btn:hover {
+    opacity: 1;
+}
+
+.form-group > div[style*="position: relative"] {
+    position: relative;
+}
+
 .form-group {
     margin-bottom: 20px;
 }

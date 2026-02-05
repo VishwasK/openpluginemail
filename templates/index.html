@@ -115,13 +115,27 @@
                     <form id="openaiCredentialsForm">
                         <div class="form-group">
                             <label for="openaiApiKey">OpenAI API Key *</label>
-                            <input 
-                                type="password" 
-                                id="openaiApiKey" 
-                                name="openaiApiKey" 
-                                placeholder="sk-..." 
-                                required
-                            >
+                            <div style="position: relative;">
+                                <input 
+                                    type="password" 
+                                    id="openaiApiKey" 
+                                    name="openaiApiKey" 
+                                    placeholder="sk-..." 
+                                    required
+                                    class="large-input"
+                                    autocomplete="off"
+                                    style="width: 100%; padding: 16px; font-size: 1rem; min-height: 60px; font-family: 'Courier New', monospace;"
+                                >
+                                <button 
+                                    type="button" 
+                                    class="toggle-password-btn" 
+                                    id="toggleOpenAIKey"
+                                    onclick="togglePasswordVisibility('openaiApiKey', this)"
+                                    title="Show/Hide API Key"
+                                >
+                                    👁️
+                                </button>
+                            </div>
                             <small class="help-text">
                                 Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>. 
                                 Your key is stored locally in your browser and never sent to our servers.

@@ -239,6 +239,18 @@ document.getElementById('credentialsForm').addEventListener('submit', (e) => {
 // Handle clear credentials button
 document.getElementById('clearCredentialsBtn').addEventListener('click', clearCredentials);
 
+// Toggle password visibility
+function togglePasswordVisibility(inputId, button) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        button.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        button.textContent = '👁️';
+    }
+}
+
 // OpenAI API Key Management
 function loadOpenAICredentials() {
     try {
@@ -246,7 +258,10 @@ function loadOpenAICredentials() {
         const model = localStorage.getItem(OPENAI_MODEL_KEY) || 'gpt-4';
         
         if (apiKey) {
-            document.getElementById('openaiApiKey').value = apiKey;
+            const apiKeyInput = document.getElementById('openaiApiKey');
+            apiKeyInput.value = apiKey;
+            apiKeyInput.removeAttribute('readonly');
+            apiKeyInput.removeAttribute('disabled');
             document.getElementById('openaiModel').value = model;
             document.getElementById('clearOpenAIBtn').style.display = 'inline-block';
         }
