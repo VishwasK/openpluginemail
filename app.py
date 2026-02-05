@@ -10,6 +10,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import logging
+from openai import OpenAI
 
 app = Flask(__name__)
 CORS(app)
@@ -157,6 +158,215 @@ class EmailPlugin:
 email_plugin = EmailPlugin()
 
 
+class StoryPlugin:
+    """OpenPlugin Story Writing Plugin Implementation"""
+    
+    def __init__(self):
+        pass
+    
+    def write_story(self, prompt, api_key, genre=None, length="medium", tone=None, model="gpt-4"):
+        """
+        Write a new story using OpenAI
+        
+        Args:
+            prompt: Story prompt/description
+            api_key: OpenAI API key
+            genre: Story genre (optional)
+            length: Story length - short, medium, long (default: medium)
+            tone: Story tone (optional)
+            model: OpenAI model to use (default: gpt-4)
+        
+        Returns:
+            dict: Result with success status and story text
+        """
+        try:
+            if not api_key:
+                return {
+                    'success': False,
+                    'error': 'OpenAI API key not provided'
+                }
+            
+            client = OpenAI(api_key=api_key)
+            
+            # Build the prompt
+            system_prompt = "You are a creative writing assistant. Write engaging, well-structured stories based on user prompts."
+            user_prompt = prompt
+            
+            if genre:
+                user_prompt += f"\nGenre: {genre}"
+            if length:
+                user_prompt += f"\nLength: {length} (make it approximately {'500-800 words' if length == 'short' else '1000-1500 words' if length == 'medium' else '2000+ words'})"
+            if tone:
+                user_prompt += f"\nTone: {tone}"
+            
+            # Generate story
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.8,
+                max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
+            )
+            
+            story = response.choices[0].message.content
+            
+            logger.info(f"Story written successfully (length: {length})")
+            return {
+                'success': True,
+                'story': story,
+                'length': length,
+                'model': model
+            }
+        
+        except Exception as e:
+            logger.error(f"Error writing story: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def continue_story(self, story, api_key, direction=None, length="medium", model="gpt-4"):
+        """
+        Continue an existing story
+        
+        Args:
+            story: Existing story text
+            api_key: OpenAI API key
+            direction: Optional direction for continuation
+            length: Continuation length (default: medium)
+            model: OpenAI model to use
+        
+        Returns:
+            dict: Result with success status and continuation
+        """
+        try:
+            if not api_key:
+                return {
+                    'success': False,
+                    'error': 'OpenAI API key not provided'
+                }
+            
+            client = OpenAI(api_key=api_key)
+            
+            system_prompt = "You are a creative writing assistant. Continue stories seamlessly, maintaining style, tone, and character consistency."
+            user_prompt = f"Continue this story:\n\n{story}"
+            
+            if direction:
+                user_prompt += f"\n\nDirection: {direction}"
+            if length:
+                user_prompt += f"\nLength: {length}"
+            
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.8,
+                max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
+            )
+            
+            continuation = response.choices[0].message.content
+            
+            logger.info(f"Story continued successfully")
+            return {
+                'success': True,
+                'continuation': continuation,
+                'full_story': story + "\n\n" + continuation
+            }
+        
+        except Exception as e:
+            logger.error(f"Error continuing story: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def improve_story(self, story, api_key, focus=None, style=None, model="gpt-4"):
+        """
+        Improve an existing story
+        
+        Args:
+            story: Story text to improve
+            api_key: OpenAI API key
+            focus: What to focus on (dialogue, descriptions, pacing, etc.)
+            style: Desired style (literary, casual, poetic, etc.)
+            model: OpenAI model to use
+        
+        Returns:
+            dict: Result with success status and improved story
+        """
+        try:
+            if not api_key:
+                return {
+                    'success': False,
+                    'error': 'OpenAI API key not provided'
+                }
+            
+            client = OpenAI(api_key=api_key)
+            
+            system_prompt = "You are an expert editor and writing coach. Improve stories by enhancing descriptions, dialogue, pacing, and overall writing quality while maintaining the original plot and characters."
+            user_prompt = f"Improve this story:\n\n{story}"
+            
+            if focus:
+                user_prompt += f"\n\nFocus on: {focus}"
+            if style:
+                user_prompt += f"\nStyle: {style}"
+            
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=4000
+            )
+            
+            improved = response.choices[0].message.content
+            
+            logger.info(f"Story improved successfully")
+            return {
+                'success': True,
+                'improved_story': improved
+            }
+        
+        except Exception as e:
+            logger.error(f"Error improving story: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def get_plugin_info(self):
+        """Get plugin information following OpenPlugin spec"""
+        return {
+            'plugin_name': 'story',
+            'version': '1.0.0',
+            'description': 'Write, continue, and improve stories using AI',
+            'endpoints': {
+                'write_story': '/api/story/write',
+                'continue_story': '/api/story/continue',
+                'improve_story': '/api/story/improve',
+                'plugin_info': '/api/story/info'
+            },
+            'security': {
+                'credentials': 'user-provided',
+                'storage': 'local-browser',
+                'note': 'OpenAI API key is stored locally in your browser and sent with each request. It is never stored on the server.'
+            },
+            'required_fields': {
+                'openai_api_key': 'Your OpenAI API key (get one at https://platform.openai.com/api-keys)'
+            }
+        }
+
+
+# Initialize story plugin
+story_plugin = StoryPlugin()
+
+
 @app.route('/')
 def index():
     """Main UI page"""
@@ -227,6 +437,142 @@ def send_email():
     
     except Exception as e:
         logger.error(f"Error in send_email endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/story/info', methods=['GET'])
+def story_plugin_info():
+    """Get story plugin information"""
+    return jsonify(story_plugin.get_plugin_info())
+
+
+@app.route('/api/story/write', methods=['POST'])
+def write_story():
+    """Write a new story endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'prompt' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required field: prompt'
+            }), 400
+        
+        # Extract OpenAI API key from request
+        api_key = data.get('openai_api_key')
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'OpenAI API key not provided. Please configure your API key in the UI.'
+            }), 400
+        
+        # Write story
+        result = story_plugin.write_story(
+            prompt=data['prompt'],
+            api_key=api_key,
+            genre=data.get('genre'),
+            length=data.get('length', 'medium'),
+            tone=data.get('tone'),
+            model=data.get('model', 'gpt-4')
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Error in write_story endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/story/continue', methods=['POST'])
+def continue_story():
+    """Continue a story endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'story' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required field: story'
+            }), 400
+        
+        # Extract OpenAI API key from request
+        api_key = data.get('openai_api_key')
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'OpenAI API key not provided. Please configure your API key in the UI.'
+            }), 400
+        
+        # Continue story
+        result = story_plugin.continue_story(
+            story=data['story'],
+            api_key=api_key,
+            direction=data.get('direction'),
+            length=data.get('length', 'medium'),
+            model=data.get('model', 'gpt-4')
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Error in continue_story endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/story/improve', methods=['POST'])
+def improve_story():
+    """Improve a story endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'story' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required field: story'
+            }), 400
+        
+        # Extract OpenAI API key from request
+        api_key = data.get('openai_api_key')
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'OpenAI API key not provided. Please configure your API key in the UI.'
+            }), 400
+        
+        # Improve story
+        result = story_plugin.improve_story(
+            story=data['story'],
+            api_key=api_key,
+            focus=data.get('focus'),
+            style=data.get('style'),
+            model=data.get('model', 'gpt-4')
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Error in improve_story endpoint: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)

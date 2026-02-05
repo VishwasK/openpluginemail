@@ -2,6 +2,8 @@
 
 // Credential storage keys
 const CREDENTIALS_KEY = 'openplugin_email_credentials';
+const OPENAI_KEY = 'openplugin_openai_api_key';
+const OPENAI_MODEL_KEY = 'openplugin_openai_model';
 
 // Load saved credentials from localStorage
 function loadCredentials() {
@@ -237,9 +239,287 @@ document.getElementById('credentialsForm').addEventListener('submit', (e) => {
 // Handle clear credentials button
 document.getElementById('clearCredentialsBtn').addEventListener('click', clearCredentials);
 
+// OpenAI API Key Management
+function loadOpenAICredentials() {
+    try {
+        const apiKey = localStorage.getItem(OPENAI_KEY);
+        const model = localStorage.getItem(OPENAI_MODEL_KEY) || 'gpt-4';
+        
+        if (apiKey) {
+            document.getElementById('openaiApiKey').value = apiKey;
+            document.getElementById('openaiModel').value = model;
+            document.getElementById('clearOpenAIBtn').style.display = 'inline-block';
+        }
+    } catch (error) {
+        console.error('Error loading OpenAI credentials:', error);
+    }
+}
+
+function saveOpenAICredentials() {
+    const apiKey = document.getElementById('openaiApiKey').value.trim();
+    const model = document.getElementById('openaiModel').value;
+    
+    if (apiKey) {
+        localStorage.setItem(OPENAI_KEY, apiKey);
+        localStorage.setItem(OPENAI_MODEL_KEY, model);
+        document.getElementById('clearOpenAIBtn').style.display = 'inline-block';
+        return { apiKey, model };
+    }
+    return null;
+}
+
+function getOpenAICredentials() {
+    const saved = localStorage.getItem(OPENAI_KEY);
+    const model = localStorage.getItem(OPENAI_MODEL_KEY) || 'gpt-4';
+    
+    if (saved) {
+        return { apiKey: saved, model };
+    }
+    
+    // Fallback to form values
+    return {
+        apiKey: document.getElementById('openaiApiKey').value.trim(),
+        model: document.getElementById('openaiModel').value
+    };
+}
+
+function clearOpenAICredentials() {
+    if (confirm('Are you sure you want to clear your saved OpenAI API key?')) {
+        localStorage.removeItem(OPENAI_KEY);
+        localStorage.removeItem(OPENAI_MODEL_KEY);
+        document.getElementById('openaiCredentialsForm').reset();
+        document.getElementById('clearOpenAIBtn').style.display = 'none';
+    }
+}
+
+// Tab switching
+function initTabs() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTab = btn.getAttribute('data-tab');
+            
+            // Remove active class from all tabs
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => {
+                c.classList.remove('active');
+                c.style.display = 'none';
+            });
+            
+            // Add active class to clicked tab
+            btn.classList.add('active');
+            document.getElementById(targetTab).classList.add('active');
+            document.getElementById(targetTab).style.display = 'block';
+        });
+    });
+}
+
+// Story Writing
+document.getElementById('storyForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const writeBtn = document.getElementById('writeStoryBtn');
+    const btnText = writeBtn.querySelector('.btn-text');
+    const btnLoader = writeBtn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('storyResult');
+    
+    const creds = getOpenAICredentials();
+    if (!creds.apiKey) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = '✗ Please configure your OpenAI API key first';
+        return;
+    }
+    
+    writeBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/story/write', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: document.getElementById('storyPrompt').value,
+                genre: document.getElementById('storyGenre').value || null,
+                length: document.getElementById('storyLength').value,
+                tone: document.getElementById('storyTone').value || null,
+                model: creds.model,
+                openai_api_key: creds.apiKey
+            })
+        });
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            resultDiv.innerHTML = `<h3>Your Story:</h3><div class="story-text">${data.story.replace(/\n/g, '<br>')}</div>`;
+            document.getElementById('continueStoryText').value = data.story;
+            document.getElementById('improveStoryText').value = data.story;
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to write story'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Network error: ${error.message}`;
+    } finally {
+        writeBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Continue Story
+document.getElementById('continueStoryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const continueBtn = document.getElementById('continueStoryBtn');
+    const btnText = continueBtn.querySelector('.btn-text');
+    const btnLoader = continueBtn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('continueResult');
+    
+    const creds = getOpenAICredentials();
+    if (!creds.apiKey) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = '✗ Please configure your OpenAI API key first';
+        return;
+    }
+    
+    continueBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/story/continue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                story: document.getElementById('continueStoryText').value,
+                direction: document.getElementById('continueDirection').value || null,
+                length: document.getElementById('continueLength').value,
+                model: creds.model,
+                openai_api_key: creds.apiKey
+            })
+        });
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            resultDiv.innerHTML = `<h3>Continuation:</h3><div class="story-text">${data.continuation.replace(/\n/g, '<br>')}</div><h4>Full Story:</h4><div class="story-text">${data.full_story.replace(/\n/g, '<br>')}</div>`;
+            document.getElementById('continueStoryText').value = data.full_story;
+            document.getElementById('improveStoryText').value = data.full_story;
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to continue story'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Network error: ${error.message}`;
+    } finally {
+        continueBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Improve Story
+document.getElementById('improveStoryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const improveBtn = document.getElementById('improveStoryBtn');
+    const btnText = improveBtn.querySelector('.btn-text');
+    const btnLoader = improveBtn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('improveResult');
+    
+    const creds = getOpenAICredentials();
+    if (!creds.apiKey) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = '✗ Please configure your OpenAI API key first';
+        return;
+    }
+    
+    improveBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/story/improve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                story: document.getElementById('improveStoryText').value,
+                focus: document.getElementById('improveFocus').value || null,
+                style: document.getElementById('improveStyle').value || null,
+                model: creds.model,
+                openai_api_key: creds.apiKey
+            })
+        });
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            resultDiv.innerHTML = `<h3>Improved Story:</h3><div class="story-text">${data.improved_story.replace(/\n/g, '<br>')}</div>`;
+            document.getElementById('improveStoryText').value = data.improved_story;
+            document.getElementById('continueStoryText').value = data.improved_story;
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to improve story'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Network error: ${error.message}`;
+    } finally {
+        improveBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Handle OpenAI credentials form
+document.getElementById('openaiCredentialsForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    saveOpenAICredentials();
+    
+    const resultMessage = document.createElement('div');
+    resultMessage.className = 'result-message success';
+    resultMessage.textContent = '✓ OpenAI API key saved locally in your browser';
+    resultMessage.style.marginTop = '15px';
+    
+    const form = document.getElementById('openaiCredentialsForm');
+    const existingMessage = form.querySelector('.result-message');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+    form.appendChild(resultMessage);
+    
+    setTimeout(() => {
+        resultMessage.remove();
+    }, 3000);
+});
+
+document.getElementById('clearOpenAIBtn').addEventListener('click', clearOpenAICredentials);
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadCredentials();
+    loadOpenAICredentials();
+    initTabs();
     checkHealth();
     loadPluginInfo();
     

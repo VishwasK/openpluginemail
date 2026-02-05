@@ -20,8 +20,15 @@
 
         <main>
             <div class="card credentials-card">
-                <h2>🔐 SMTP Credentials <span class="credentials-status" id="credentialsStatus"></span></h2>
+                <h2>🔐 API Credentials <span class="credentials-status" id="credentialsStatus"></span></h2>
                 <p class="info-text">Your credentials are stored locally in your browser and never sent to our servers.</p>
+                
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="smtp-tab">SMTP (Email)</button>
+                    <button class="tab-btn" data-tab="openai-tab">OpenAI (Stories)</button>
+                </div>
+                
+                <div id="smtp-tab" class="tab-content active" style="display: block;">
                 
                 <div class="mfa-info" id="mfaInfo">
                     <h3>🔒 Multi-Factor Authentication (MFA)</h3>
@@ -95,13 +102,176 @@
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">
-                            Save Credentials
+                            Save SMTP Credentials
                         </button>
                         <button type="button" class="btn btn-secondary" id="clearCredentialsBtn" style="display: none;">
                             Clear Saved Credentials
                         </button>
                     </div>
                 </form>
+                
+                <div id="openai-tab" class="tab-content" style="display: none;">
+                    <form id="openaiCredentialsForm">
+                        <div class="form-group">
+                            <label for="openaiApiKey">OpenAI API Key *</label>
+                            <input 
+                                type="password" 
+                                id="openaiApiKey" 
+                                name="openaiApiKey" 
+                                placeholder="sk-..." 
+                                required
+                            >
+                            <small class="help-text">
+                                Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>. 
+                                Your key is stored locally in your browser and never sent to our servers.
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label for="openaiModel">Model (optional)</label>
+                            <select id="openaiModel" name="openaiModel">
+                                <option value="gpt-4">GPT-4</option>
+                                <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                Save OpenAI Key
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="clearOpenAIBtn" style="display: none;">
+                                Clear Saved Key
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📖 Write Story</h2>
+                <form id="storyForm">
+                    <div class="form-group">
+                        <label for="storyPrompt">Story Prompt *</label>
+                        <textarea 
+                            id="storyPrompt" 
+                            name="storyPrompt" 
+                            rows="4" 
+                            placeholder="Write a fantasy story about a young wizard discovering their powers..." 
+                            required
+                        ></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="storyGenre">Genre (optional)</label>
+                            <input 
+                                type="text" 
+                                id="storyGenre" 
+                                name="storyGenre" 
+                                placeholder="fantasy, sci-fi, mystery, etc."
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label for="storyLength">Length</label>
+                            <select id="storyLength" name="storyLength">
+                                <option value="short">Short (500-800 words)</option>
+                                <option value="medium" selected>Medium (1000-1500 words)</option>
+                                <option value="long">Long (2000+ words)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="storyTone">Tone (optional)</label>
+                        <input 
+                            type="text" 
+                            id="storyTone" 
+                            name="storyTone" 
+                            placeholder="funny, serious, dark, adventurous, etc."
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="writeStoryBtn">
+                        <span class="btn-text">Write Story</span>
+                        <span class="btn-loader" style="display: none;">Writing...</span>
+                    </button>
+                </form>
+                <div id="storyResult" class="story-result" style="display: none;"></div>
+            </div>
+
+            <div class="card">
+                <h2>✏️ Continue Story</h2>
+                <form id="continueStoryForm">
+                    <div class="form-group">
+                        <label for="continueStoryText">Existing Story *</label>
+                        <textarea 
+                            id="continueStoryText" 
+                            name="continueStoryText" 
+                            rows="6" 
+                            placeholder="Paste your existing story here..." 
+                            required
+                        ></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="continueDirection">Direction (optional)</label>
+                        <input 
+                            type="text" 
+                            id="continueDirection" 
+                            name="continueDirection" 
+                            placeholder="e.g., Add a plot twist, introduce a new character"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="continueLength">Continuation Length</label>
+                        <select id="continueLength" name="continueLength">
+                            <option value="short">Short</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="long">Long</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="continueStoryBtn">
+                        <span class="btn-text">Continue Story</span>
+                        <span class="btn-loader" style="display: none;">Continuing...</span>
+                    </button>
+                </form>
+                <div id="continueResult" class="story-result" style="display: none;"></div>
+            </div>
+
+            <div class="card">
+                <h2>✨ Improve Story</h2>
+                <form id="improveStoryForm">
+                    <div class="form-group">
+                        <label for="improveStoryText">Story to Improve *</label>
+                        <textarea 
+                            id="improveStoryText" 
+                            name="improveStoryText" 
+                            rows="6" 
+                            placeholder="Paste your story here to improve it..." 
+                            required
+                        ></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="improveFocus">Focus (optional)</label>
+                            <input 
+                                type="text" 
+                                id="improveFocus" 
+                                name="improveFocus" 
+                                placeholder="dialogue, descriptions, pacing, etc."
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label for="improveStyle">Style (optional)</label>
+                            <input 
+                                type="text" 
+                                id="improveStyle" 
+                                name="improveStyle" 
+                                placeholder="literary, casual, poetic, etc."
+                            >
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="improveStoryBtn">
+                        <span class="btn-text">Improve Story</span>
+                        <span class="btn-loader" style="display: none;">Improving...</span>
+                    </button>
+                </form>
+                <div id="improveResult" class="story-result" style="display: none;"></div>
             </div>
 
             <div class="card">
