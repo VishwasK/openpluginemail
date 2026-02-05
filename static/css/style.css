@@ -128,6 +128,55 @@ header h1 {
     border-left: 4px solid var(--primary-color);
 }
 
+.mfa-info {
+    background: #fef3c7;
+    border: 2px solid var(--warning-color);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.mfa-info h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #92400e;
+    font-size: 1.1rem;
+}
+
+.mfa-info p {
+    margin-bottom: 15px;
+    color: #78350f;
+}
+
+.provider-links {
+    margin-top: 15px;
+}
+
+.provider-links strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #78350f;
+}
+
+.provider-links ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #78350f;
+}
+
+.provider-links li {
+    margin-bottom: 5px;
+}
+
+.provider-links a {
+    color: #1e40af;
+    text-decoration: underline;
+}
+
+.provider-links a:hover {
+    color: var(--primary-dark);
+}
+
 .form-row {
     display: grid;
     grid-template-columns: 2fr 1fr;

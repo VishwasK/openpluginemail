@@ -185,7 +185,18 @@ document.getElementById('emailForm').addEventListener('submit', async (e) => {
             document.getElementById('emailForm').reset();
         } else {
             resultMessage.className = 'result-message error';
-            resultMessage.textContent = `✗ Error: ${data.error || 'Failed to send email'}`;
+            let errorText = `✗ Error: ${data.error || 'Failed to send email'}`;
+            
+            // Add helpful links for authentication errors
+            if (data.error_code === 'AUTH_FAILED' && data.helpful_links) {
+                errorText += '\n\nNeed help? Generate an App Password:';
+                const links = data.helpful_links;
+                if (links.gmail) errorText += `\n• Gmail: ${links.gmail}`;
+                if (links.microsoft) errorText += `\n• Microsoft/Outlook: ${links.microsoft}`;
+                if (links.yahoo) errorText += `\n• Yahoo: ${links.yahoo}`;
+            }
+            
+            resultMessage.innerHTML = errorText.replace(/\n/g, '<br>');
         }
     } catch (error) {
         resultMessage.style.display = 'block';

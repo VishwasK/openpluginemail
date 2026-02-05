@@ -81,7 +81,23 @@ class EmailPlugin:
             # Send email (credentials are used here but never stored or logged)
             with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
-                server.login(smtp_username, smtp_password)
+                try:
+                    server.login(smtp_username, smtp_password)
+                except smtplib.SMTPAuthenticationError as auth_error:
+                    # Provide helpful error message for MFA/authentication issues
+                    error_msg = str(auth_error)
+                    if '535' in error_msg or '534' in error_msg or 'authentication failed' in error_msg.lower():
+                        return {
+                            'success': False,
+                            'error': 'SMTP Authentication failed. If your account has Multi-Factor Authentication (MFA) enabled, you must use an App Password instead of your regular password. Please generate an App Password from your email provider settings.',
+                            'error_code': 'AUTH_FAILED',
+                            'helpful_links': {
+                                'gmail': 'https://myaccount.google.com/apppasswords',
+                                'microsoft': 'https://account.microsoft.com/security',
+                                'yahoo': 'https://login.yahoo.com/account/security'
+                            }
+                        }
+                    raise
                 server.send_message(msg)
             
             logger.info(f"Email sent successfully to {to_email} (using user-provided credentials)")
@@ -90,6 +106,19 @@ class EmailPlugin:
                 'message': f'Email sent successfully to {to_email}'
             }
         
+        except smtplib.SMTPAuthenticationError:
+            # This should be caught above, but just in case
+            return {
+                'success': False,
+                'error': 'SMTP Authentication failed. Please check your credentials. If MFA is enabled, use an App Password.',
+                'error_code': 'AUTH_FAILED'
+            }
+        except smtplib.SMTPException as smtp_error:
+            logger.error(f"SMTP error: {str(smtp_error)}")
+            return {
+                'success': False,
+                'error': f'SMTP error: {str(smtp_error)}'
+            }
         except Exception as e:
             logger.error(f"Error sending email: {str(e)}")
             return {

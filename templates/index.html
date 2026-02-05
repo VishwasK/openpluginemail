@@ -22,6 +22,19 @@
             <div class="card credentials-card">
                 <h2>🔐 SMTP Credentials <span class="credentials-status" id="credentialsStatus"></span></h2>
                 <p class="info-text">Your credentials are stored locally in your browser and never sent to our servers.</p>
+                
+                <div class="mfa-info" id="mfaInfo">
+                    <h3>🔒 Multi-Factor Authentication (MFA)</h3>
+                    <p>If your email account has MFA enabled, you <strong>must use an App Password</strong> instead of your regular password.</p>
+                    <div class="provider-links">
+                        <strong>Generate App Password:</strong>
+                        <ul>
+                            <li><a href="https://myaccount.google.com/apppasswords" target="_blank">Gmail App Password</a></li>
+                            <li><a href="https://account.microsoft.com/security" target="_blank">Microsoft/Outlook App Password</a></li>
+                            <li><a href="https://login.yahoo.com/account/security" target="_blank">Yahoo App Password</a></li>
+                        </ul>
+                    </div>
+                </div>
                 <form id="credentialsForm">
                     <div class="form-row">
                         <div class="form-group">
@@ -64,7 +77,11 @@
                             placeholder="Your SMTP password or app password" 
                             required
                         >
-                        <small class="help-text">For Gmail, use an App Password (not your regular password)</small>
+                        <small class="help-text">
+                            <strong>Important:</strong> If your account has Multi-Factor Authentication (MFA) enabled, 
+                            you <strong>must use an App Password</strong> (not your regular password). 
+                            Regular passwords will not work with MFA-enabled accounts.
+                        </small>
                     </div>
                     <div class="form-group">
                         <label for="fromEmail">From Email</label>

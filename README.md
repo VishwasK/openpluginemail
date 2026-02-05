@@ -193,17 +193,55 @@ OpenEmailDemo/
 
 ### Supported SMTP Providers
 
-- Gmail (requires App Password)
-- Outlook/Office 365
-- Yahoo Mail
-- Custom SMTP servers
-- Any SMTP-compatible email service
+- **Gmail** - Requires App Password if MFA is enabled
+- **Outlook/Office 365** - Requires App Password if MFA is enabled
+- **Yahoo Mail** - Requires App Password if MFA is enabled
+- **Custom SMTP servers** - Any SMTP-compatible email service
+- **Any SMTP-compatible email service**
 
-### Gmail Setup
+**Note:** Most modern email providers enable MFA by default. If authentication fails, check if your account has MFA enabled and use an App Password instead of your regular password.
 
-1. Enable 2-Step Verification in your Google Account
-2. Generate an App Password: https://myaccount.google.com/apppasswords
-3. Use the app password (not your regular password) in the credentials form
+### Multi-Factor Authentication (MFA) & App Passwords
+
+**Important:** If your email account has Multi-Factor Authentication (MFA) enabled, you **must use an App Password** instead of your regular password. Regular passwords will not work with MFA-enabled accounts.
+
+#### Why App Passwords?
+
+When MFA is enabled, email providers require App Passwords for SMTP access because:
+- SMTP doesn't support interactive MFA prompts
+- App Passwords are application-specific and more secure
+- They allow apps to access your email without compromising your main password
+
+#### How to Generate App Passwords
+
+**Gmail:**
+1. Enable 2-Step Verification: https://myaccount.google.com/security
+2. Generate App Password: https://myaccount.google.com/apppasswords
+3. Select "Mail" and your device
+4. Copy the 16-character password and use it in the credentials form
+
+**Microsoft/Outlook:**
+1. Go to: https://account.microsoft.com/security
+2. Enable 2-Step Verification
+3. Go to "App passwords" section
+4. Generate a new app password for "Mail"
+5. Use the generated password in the credentials form
+
+**Yahoo:**
+1. Go to: https://login.yahoo.com/account/security
+2. Enable 2-Step Verification
+3. Generate an App Password
+4. Use the generated password in the credentials form
+
+#### Troubleshooting Authentication Errors
+
+If you see an authentication error:
+1. **Check if MFA is enabled** - If yes, you must use an App Password
+2. **Verify App Password** - Make sure you copied the entire App Password correctly
+3. **Check SMTP settings** - Ensure server and port are correct for your provider
+4. **Try regenerating** - Sometimes regenerating the App Password helps
+
+The app will automatically detect authentication failures and provide helpful error messages with links to generate App Passwords.
 
 ## Environment Variables (Optional - for backward compatibility)
 
