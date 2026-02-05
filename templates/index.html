@@ -19,6 +19,74 @@
         </div>
 
         <main>
+            <div class="card credentials-card">
+                <h2>🔐 SMTP Credentials <span class="credentials-status" id="credentialsStatus"></span></h2>
+                <p class="info-text">Your credentials are stored locally in your browser and never sent to our servers.</p>
+                <form id="credentialsForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="smtpServer">SMTP Server *</label>
+                            <input 
+                                type="text" 
+                                id="smtpServer" 
+                                name="smtpServer" 
+                                placeholder="smtp.gmail.com" 
+                                required
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label for="smtpPort">SMTP Port *</label>
+                            <input 
+                                type="number" 
+                                id="smtpPort" 
+                                name="smtpPort" 
+                                placeholder="587" 
+                                required
+                            >
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="smtpUsername">Email/Username *</label>
+                        <input 
+                            type="email" 
+                            id="smtpUsername" 
+                            name="smtpUsername" 
+                            placeholder="your-email@gmail.com" 
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="smtpPassword">Password/App Password *</label>
+                        <input 
+                            type="password" 
+                            id="smtpPassword" 
+                            name="smtpPassword" 
+                            placeholder="Your SMTP password or app password" 
+                            required
+                        >
+                        <small class="help-text">For Gmail, use an App Password (not your regular password)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="fromEmail">From Email</label>
+                        <input 
+                            type="email" 
+                            id="fromEmail" 
+                            name="fromEmail" 
+                            placeholder="your-email@gmail.com (optional)"
+                        >
+                        <small class="help-text">Leave empty to use your username as sender</small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            Save Credentials
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="clearCredentialsBtn" style="display: none;">
+                            Clear Saved Credentials
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <div class="card">
                 <h2>Send Email</h2>
                 <form id="emailForm">

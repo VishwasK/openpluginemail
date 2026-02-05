@@ -29,7 +29,7 @@ class EmailPlugin:
         self.smtp_password = os.getenv('SMTP_PASSWORD')
         self.from_email = os.getenv('FROM_EMAIL', self.smtp_username)
     
-    def send_email(self, to_email, subject, body, is_html=False):
+    def send_email(self, to_email, subject, body, smtp_config=None, is_html=False):
         """
         Send an email using SMTP
         
@@ -37,21 +37,38 @@ class EmailPlugin:
             to_email: Recipient email address
             subject: Email subject
             body: Email body content
+            smtp_config: Dictionary with SMTP configuration (server, port, username, password, from_email)
             is_html: Whether the body is HTML formatted
         
         Returns:
             dict: Result with success status and message
         """
         try:
-            if not self.smtp_username or not self.smtp_password:
+            # Use provided credentials or fall back to environment variables (for backward compatibility)
+            if smtp_config:
+                smtp_server = smtp_config.get('smtp_server')
+                smtp_port = int(smtp_config.get('smtp_port', 587))
+                smtp_username = smtp_config.get('smtp_username')
+                smtp_password = smtp_config.get('smtp_password')
+                from_email = smtp_config.get('from_email', smtp_username)
+            else:
+                # Fallback to env vars (for backward compatibility)
+                smtp_server = self.smtp_server
+                smtp_port = self.smtp_port
+                smtp_username = self.smtp_username
+                smtp_password = self.smtp_password
+                from_email = self.from_email
+            
+            # Validate credentials
+            if not smtp_server or not smtp_port or not smtp_username or not smtp_password:
                 return {
                     'success': False,
-                    'error': 'SMTP credentials not configured'
+                    'error': 'SMTP credentials not provided'
                 }
             
             # Create message
             msg = MIMEMultipart('alternative')
-            msg['From'] = self.from_email
+            msg['From'] = from_email
             msg['To'] = to_email
             msg['Subject'] = subject
             
@@ -61,13 +78,13 @@ class EmailPlugin:
             else:
                 msg.attach(MIMEText(body, 'plain'))
             
-            # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+            # Send email (credentials are used here but never stored or logged)
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
-                server.login(self.smtp_username, self.smtp_password)
+                server.login(smtp_username, smtp_password)
                 server.send_message(msg)
             
-            logger.info(f"Email sent successfully to {to_email}")
+            logger.info(f"Email sent successfully to {to_email} (using user-provided credentials)")
             return {
                 'success': True,
                 'message': f'Email sent successfully to {to_email}'
@@ -90,13 +107,20 @@ class EmailPlugin:
                 'send_email': '/api/email/send',
                 'plugin_info': '/api/email/info'
             },
-            'required_env_vars': [
-                'SMTP_SERVER',
-                'SMTP_PORT',
-                'SMTP_USERNAME',
-                'SMTP_PASSWORD',
-                'FROM_EMAIL'
-            ]
+            'security': {
+                'credentials': 'user-provided',
+                'storage': 'local-browser',
+                'note': 'Credentials are stored locally in your browser and sent with each request. They are never stored on the server.'
+            },
+            'required_fields': {
+                'smtp_config': {
+                    'smtp_server': 'SMTP server address (e.g., smtp.gmail.com)',
+                    'smtp_port': 'SMTP port (e.g., 587)',
+                    'smtp_username': 'Your email/username',
+                    'smtp_password': 'Your password or app password',
+                    'from_email': 'Sender email (optional, defaults to username)'
+                }
+            }
         }
 
 
@@ -128,7 +152,7 @@ def plugin_info():
 
 @app.route('/api/email/send', methods=['POST'])
 def send_email():
-    """Send email endpoint"""
+    """Send email endpoint - accepts user-provided credentials"""
     try:
         data = request.get_json()
         
@@ -141,11 +165,29 @@ def send_email():
                     'error': f'Missing required field: {field}'
                 }), 400
         
-        # Send email
+        # Extract SMTP config from request (user-provided credentials)
+        smtp_config = data.get('smtp_config')
+        if not smtp_config:
+            return jsonify({
+                'success': False,
+                'error': 'SMTP credentials not provided. Please configure your credentials in the UI.'
+            }), 400
+        
+        # Validate SMTP config fields
+        required_smtp_fields = ['smtp_server', 'smtp_port', 'smtp_username', 'smtp_password']
+        for field in required_smtp_fields:
+            if field not in smtp_config or not smtp_config[field]:
+                return jsonify({
+                    'success': False,
+                    'error': f'Missing required SMTP field: {field}'
+                }), 400
+        
+        # Send email with user-provided credentials
         result = email_plugin.send_email(
             to_email=data['to_email'],
             subject=data['subject'],
             body=data['body'],
+            smtp_config=smtp_config,
             is_html=data.get('is_html', False)
         )
         
