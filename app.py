@@ -10,14 +10,21 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import logging
-from openai import OpenAI
 
 app = Flask(__name__)
 CORS(app)
 
-# Configure logging
+# Configure logging first
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Import OpenAI with error handling
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    logger.warning("OpenAI package not available. Story plugin will be disabled.")
 
 
 class EmailPlugin:
@@ -180,6 +187,12 @@ class StoryPlugin:
             dict: Result with success status and story text
         """
         try:
+            if not OPENAI_AVAILABLE:
+                return {
+                    'success': False,
+                    'error': 'OpenAI package not available. Please ensure openai package is installed.'
+                }
+            
             if not api_key:
                 return {
                     'success': False,
@@ -242,6 +255,12 @@ class StoryPlugin:
             dict: Result with success status and continuation
         """
         try:
+            if not OPENAI_AVAILABLE:
+                return {
+                    'success': False,
+                    'error': 'OpenAI package not available. Please ensure openai package is installed.'
+                }
+            
             if not api_key:
                 return {
                     'success': False,
@@ -299,6 +318,12 @@ class StoryPlugin:
             dict: Result with success status and improved story
         """
         try:
+            if not OPENAI_AVAILABLE:
+                return {
+                    'success': False,
+                    'error': 'OpenAI package not available. Please ensure openai package is installed.'
+                }
+            
             if not api_key:
                 return {
                     'success': False,
