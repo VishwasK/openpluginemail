@@ -530,6 +530,130 @@ document.getElementById('openaiCredentialsForm').addEventListener('submit', (e) 
 
 document.getElementById('clearOpenAIBtn').addEventListener('click', clearOpenAICredentials);
 
+// Web Search
+document.getElementById('webSearchForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const searchBtn = document.getElementById('webSearchBtn');
+    const btnText = searchBtn.querySelector('.btn-text');
+    const btnLoader = searchBtn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('webSearchResult');
+    
+    searchBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/websearch/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: document.getElementById('searchQuery').value,
+                max_results: parseInt(document.getElementById('searchResults').value),
+                region: document.getElementById('searchRegion').value
+            })
+        });
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            let html = `<h3>Search Results for: "${data.query}"</h3>`;
+            html += `<p><strong>Found ${data.count} results:</strong></p>`;
+            
+            data.results.forEach((result, index) => {
+                html += `<div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid var(--primary-color);">`;
+                html += `<h4 style="margin-top: 0;">${index + 1}. ${result.title}</h4>`;
+                html += `<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 5px 0;"><a href="${result.url}" target="_blank" style="color: var(--primary-color);">${result.url}</a></p>`;
+                html += `<p style="margin: 10px 0;">${result.snippet}</p>`;
+                html += `</div>`;
+            });
+            
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to search'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Network error: ${error.message}`;
+    } finally {
+        searchBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Search and Summarize
+document.getElementById('searchSummarizeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const summarizeBtn = document.getElementById('searchSummarizeBtn');
+    const btnText = summarizeBtn.querySelector('.btn-text');
+    const btnLoader = summarizeBtn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('searchSummarizeResult');
+    
+    const creds = getOpenAICredentials();
+    if (!creds.apiKey) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = '✗ Please configure your OpenAI API key first';
+        return;
+    }
+    
+    summarizeBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/websearch/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: document.getElementById('summarizeQuery').value,
+                max_results: parseInt(document.getElementById('summarizeResults').value),
+                focus: document.getElementById('summarizeFocus').value || null,
+                model: creds.model,
+                openai_api_key: creds.apiKey
+            })
+        });
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            let html = `<h3>Summary for: "${data.query}"</h3>`;
+            html += `<div class="story-text">${data.summary.replace(/\n/g, '<br>')}</div>`;
+            html += `<h4 style="margin-top: 20px;">Sources (${data.sources_count}):</h4>`;
+            html += `<ul style="list-style: none; padding: 0;">`;
+            data.search_results.forEach((result, index) => {
+                html += `<li style="margin-bottom: 10px; padding: 10px; background: white; border-radius: 4px;">`;
+                html += `<strong>${index + 1}.</strong> <a href="${result.url}" target="_blank" style="color: var(--primary-color);">${result.title}</a>`;
+                html += `</li>`;
+            });
+            html += `</ul>`;
+            
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to search and summarize'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Network error: ${error.message}`;
+    } finally {
+        summarizeBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadCredentials();

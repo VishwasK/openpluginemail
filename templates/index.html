@@ -290,6 +290,86 @@
             </div>
 
             <div class="card">
+                <h2>🔍 Web Search</h2>
+                <form id="webSearchForm">
+                    <div class="form-group">
+                        <label for="searchQuery">Search Query *</label>
+                        <input 
+                            type="text" 
+                            id="searchQuery" 
+                            name="searchQuery" 
+                            placeholder="Enter your search query..." 
+                            required
+                        >
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="searchResults">Number of Results</label>
+                            <select id="searchResults" name="searchResults">
+                                <option value="3">3</option>
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="searchRegion">Region</label>
+                            <select id="searchRegion" name="searchRegion">
+                                <option value="us-en" selected>US English</option>
+                                <option value="uk-en">UK English</option>
+                                <option value="es-es">Spanish</option>
+                                <option value="fr-fr">French</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="webSearchBtn">
+                        <span class="btn-text">Search Web</span>
+                        <span class="btn-loader" style="display: none;">Searching...</span>
+                    </button>
+                </form>
+                <div id="webSearchResult" class="story-result" style="display: none;"></div>
+            </div>
+
+            <div class="card">
+                <h2>📊 Search & Summarize</h2>
+                <form id="searchSummarizeForm">
+                    <div class="form-group">
+                        <label for="summarizeQuery">Question or Query *</label>
+                        <input 
+                            type="text" 
+                            id="summarizeQuery" 
+                            name="summarizeQuery" 
+                            placeholder="What are the latest features in Python 3.12?" 
+                            required
+                        >
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="summarizeResults">Number of Sources</label>
+                            <select id="summarizeResults" name="summarizeResults">
+                                <option value="3">3</option>
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="summarizeFocus">Focus (optional)</label>
+                            <input 
+                                type="text" 
+                                id="summarizeFocus" 
+                                name="summarizeFocus" 
+                                placeholder="e.g., new features, improvements"
+                            >
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="searchSummarizeBtn">
+                        <span class="btn-text">Search & Summarize</span>
+                        <span class="btn-loader" style="display: none;">Searching & Summarizing...</span>
+                    </button>
+                </form>
+                <div id="searchSummarizeResult" class="story-result" style="display: none;"></div>
+            </div>
+
+            <div class="card">
                 <h2>Send Email</h2>
                 <form id="emailForm">
                     <div class="form-group">

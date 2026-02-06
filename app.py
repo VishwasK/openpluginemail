@@ -26,6 +26,15 @@ except ImportError:
     OPENAI_AVAILABLE = False
     logger.warning("OpenAI package not available. Story plugin will be disabled.")
 
+# Import DuckDuckGo search with error handling
+try:
+    from duckduckgo_search import DDGS
+    DDGS_AVAILABLE = True
+except ImportError:
+    DDGS_AVAILABLE = False
+    DDGS = None
+    logger.warning("duckduckgo-search package not available. Web search plugin will be disabled.")
+
 
 class EmailPlugin:
     """OpenPlugin Email Plugin Implementation"""
@@ -407,6 +416,176 @@ class StoryPlugin:
 story_plugin = StoryPlugin()
 
 
+class WebSearchPlugin:
+    """OpenPlugin Web Search Plugin Implementation"""
+    
+    def __init__(self):
+        if DDGS_AVAILABLE:
+            self.ddgs = DDGS()
+        else:
+            self.ddgs = None
+    
+    def search(self, query, max_results=5, region="us-en"):
+        """
+        Search the web using DuckDuckGo
+        
+        Args:
+            query: Search query
+            max_results: Maximum number of results (default: 5)
+            region: Region/language for search (default: us-en)
+        
+        Returns:
+            dict: Result with success status and search results
+        """
+        try:
+            if not DDGS_AVAILABLE or not self.ddgs:
+                return {
+                    'success': False,
+                    'error': 'DuckDuckGo search not available. Please ensure duckduckgo-search package is installed.'
+                }
+            
+            if not query:
+                return {
+                    'success': False,
+                    'error': 'Search query is required'
+                }
+            
+            # Perform search
+            results = self.ddgs.text(query, max_results=max_results, region=region)
+            
+            # Format results
+            formatted_results = []
+            for i, result in enumerate(results, 1):
+                formatted_results.append({
+                    "title": result.get("title", ""),
+                    "url": result.get("href", ""),
+                    "snippet": result.get("body", ""),
+                    "rank": i
+                })
+            
+            logger.info(f"Web search completed for: {query} ({len(formatted_results)} results)")
+            return {
+                'success': True,
+                'query': query,
+                'results': formatted_results,
+                'count': len(formatted_results)
+            }
+        
+        except Exception as e:
+            logger.error(f"Error performing web search: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def search_and_summarize(self, query, api_key, max_results=5, focus=None, model="gpt-4"):
+        """
+        Search the web and get an LLM-powered summary
+        
+        Args:
+            query: Search query or question
+            api_key: OpenAI API key for summarization
+            max_results: Number of search results to use (default: 5)
+            focus: What to focus on in the summary (optional)
+            model: OpenAI model to use (default: gpt-4)
+        
+        Returns:
+            dict: Result with success status, search results, and summary
+        """
+        try:
+            if not DDGS_AVAILABLE or not self.ddgs:
+                return {
+                    'success': False,
+                    'error': 'DuckDuckGo search not available. Please ensure duckduckgo-search package is installed.'
+                }
+            
+            if not OPENAI_AVAILABLE:
+                return {
+                    'success': False,
+                    'error': 'OpenAI package not available. Please ensure openai package is installed.'
+                }
+            
+            if not api_key:
+                return {
+                    'success': False,
+                    'error': 'OpenAI API key not provided for summarization'
+                }
+            
+            # Perform search
+            search_result = self.search(query, max_results=max_results)
+            if not search_result['success']:
+                return search_result
+            
+            # Format search results for LLM
+            context = f"Web search results for: {query}\n\n"
+            for i, result in enumerate(search_result['results'], 1):
+                context += f"Source {i}: {result['title']}\n"
+                context += f"URL: {result['url']}\n"
+                context += f"Content: {result['snippet']}\n\n"
+            
+            # Generate summary using OpenAI
+            client = OpenAI(
+                api_key=api_key,
+                timeout=60.0,
+                max_retries=2
+            )
+            
+            system_prompt = "You are a helpful assistant that summarizes web search results to answer questions clearly and accurately."
+            user_prompt = f"Question: {query}\n\nSearch Results:\n{context}"
+            if focus:
+                user_prompt += f"\n\nFocus on: {focus}"
+            
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            
+            summary = response.choices[0].message.content
+            
+            logger.info(f"Search and summarize completed for: {query}")
+            return {
+                'success': True,
+                'query': query,
+                'search_results': search_result['results'],
+                'summary': summary,
+                'sources_count': len(search_result['results'])
+            }
+        
+        except Exception as e:
+            logger.error(f"Error in search and summarize: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def get_plugin_info(self):
+        """Get plugin information following OpenPlugin spec"""
+        return {
+            'plugin_name': 'web-search',
+            'version': '1.0.0',
+            'description': 'Search the web and get summarized answers',
+            'endpoints': {
+                'search': '/api/websearch/search',
+                'search_and_summarize': '/api/websearch/summarize',
+                'plugin_info': '/api/websearch/info'
+            },
+            'features': {
+                'no_api_key_required': 'Basic search works without API keys',
+                'summarize_requires_openai': 'Summarization requires OpenAI API key',
+                'uses_duckduckgo': 'Uses DuckDuckGo search (free, no API key needed)'
+            }
+        }
+
+
+# Initialize web search plugin
+websearch_plugin = WebSearchPlugin()
+
+
 @app.route('/')
 def index():
     """Main UI page"""
@@ -613,6 +792,88 @@ def improve_story():
     
     except Exception as e:
         logger.error(f"Error in improve_story endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/websearch/info', methods=['GET'])
+def websearch_plugin_info():
+    """Get web search plugin information"""
+    return jsonify(websearch_plugin.get_plugin_info())
+
+
+@app.route('/api/websearch/search', methods=['POST'])
+def web_search():
+    """Web search endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'query' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required field: query'
+            }), 400
+        
+        # Perform search
+        result = websearch_plugin.search(
+            query=data['query'],
+            max_results=data.get('max_results', 5),
+            region=data.get('region', 'us-en')
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Error in web_search endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/websearch/summarize', methods=['POST'])
+def web_search_summarize():
+    """Web search and summarize endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'query' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required field: query'
+            }), 400
+        
+        # Extract OpenAI API key from request
+        api_key = data.get('openai_api_key')
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'OpenAI API key not provided. Please configure your API key in the UI.'
+            }), 400
+        
+        # Search and summarize
+        result = websearch_plugin.search_and_summarize(
+            query=data['query'],
+            api_key=api_key,
+            max_results=data.get('max_results', 5),
+            focus=data.get('focus'),
+            model=data.get('model', 'gpt-4')
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Error in web_search_summarize endpoint: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
