@@ -289,6 +289,10 @@
 
             <div class="card">
                 <h2>🔍 Web Search</h2>
+                <div class="info-text" style="margin-bottom: 20px;">
+                    <strong>⚠️ Note:</strong> Web search uses DuckDuckGo and may return zero results on Heroku due to rate limiting or IP blocking. 
+                    This is a known limitation when running on cloud platforms. Search works better when running locally.
+                </div>
                 <form id="webSearchForm">
                     <div class="form-group">
                         <label for="searchQuery">Search Query *</label>
@@ -329,6 +333,9 @@
 
             <div class="card">
                 <h2>📊 Search & Summarize</h2>
+                <div class="info-text" style="margin-bottom: 20px;">
+                    <strong>⚠️ Note:</strong> Requires web search to work first. If search returns zero results, summarization will also fail.
+                </div>
                 <form id="searchSummarizeForm">
                     <div class="form-group">
                         <label for="summarizeQuery">Question or Query *</label>
