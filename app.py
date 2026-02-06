@@ -421,9 +421,10 @@ class WebSearchPlugin:
     
     def __init__(self):
         if DDGS_AVAILABLE:
-            self.ddgs = DDGS()
+            # Don't create DDGS instance here - create fresh for each search
+            self.ddgs_available = True
         else:
-            self.ddgs = None
+            self.ddgs_available = False
     
     def search(self, query, max_results=5, region="us-en"):
         """
@@ -438,7 +439,7 @@ class WebSearchPlugin:
             dict: Result with success status and search results
         """
         try:
-            if not DDGS_AVAILABLE or not self.ddgs:
+            if not DDGS_AVAILABLE or not self.ddgs_available:
                 return {
                     'success': False,
                     'error': 'DuckDuckGo search not available. Please ensure duckduckgo-search package is installed.'
@@ -450,54 +451,51 @@ class WebSearchPlugin:
                     'error': 'Search query is required'
                 }
             
-            # Perform search - DuckDuckGo returns an iterator, convert to list
+            # Create fresh DDGS instance for each search (some versions have issues with reuse)
             try:
-                results = list(self.ddgs.text(query, max_results=max_results, region=region))
-            except Exception as search_error:
-                logger.error(f"DuckDuckGo search error: {str(search_error)}")
-                return {
-                    'success': False,
-                    'error': f'Search failed: {str(search_error)}'
-                }
-            
-            # Check if we got results
-            if not results or len(results) == 0:
-                logger.warning(f"No results found for query: {query}")
+                ddgs = DDGS()
+                # Perform search - DuckDuckGo returns an iterator
+                results = ddgs.text(query, max_results=max_results, region=region)
+                
+                # Convert iterator to list and format results
+                formatted_results = []
+                for i, result in enumerate(results, 1):
+                    # DuckDuckGo returns dicts with 'title', 'href', 'body' keys
+                    formatted_results.append({
+                        "title": result.get("title", ""),
+                        "url": result.get("href", ""),
+                        "snippet": result.get("body", ""),
+                        "rank": i
+                    })
+                
+                # Check if we got results
+                if not formatted_results or len(formatted_results) == 0:
+                    logger.warning(f"No results found for query: {query}")
+                    return {
+                        'success': True,
+                        'query': query,
+                        'results': [],
+                        'count': 0,
+                        'message': 'No results found. Try a different search query.'
+                    }
+                
+                logger.info(f"Web search completed for: {query} ({len(formatted_results)} results)")
                 return {
                     'success': True,
                     'query': query,
-                    'results': [],
-                    'count': 0,
-                    'message': 'No results found. Try a different search query.'
+                    'results': formatted_results,
+                    'count': len(formatted_results)
                 }
-            
-            # Format results
-            formatted_results = []
-            for i, result in enumerate(results, 1):
-                # Handle both dict and object results
-                if isinstance(result, dict):
-                    formatted_results.append({
-                        "title": result.get("title", ""),
-                        "url": result.get("href", result.get("url", "")),
-                        "snippet": result.get("body", result.get("snippet", "")),
-                        "rank": i
-                    })
-                else:
-                    # Handle object-style results
-                    formatted_results.append({
-                        "title": getattr(result, "title", ""),
-                        "url": getattr(result, "href", getattr(result, "url", "")),
-                        "snippet": getattr(result, "body", getattr(result, "snippet", "")),
-                        "rank": i
-                    })
-            
-            logger.info(f"Web search completed for: {query} ({len(formatted_results)} results)")
-            return {
-                'success': True,
-                'query': query,
-                'results': formatted_results,
-                'count': len(formatted_results)
-            }
+                
+            except Exception as search_error:
+                logger.error(f"DuckDuckGo search error: {str(search_error)}")
+                # Log the full error for debugging
+                import traceback
+                logger.error(traceback.format_exc())
+                return {
+                    'success': False,
+                    'error': f'Search failed: {str(search_error)}. Please try again or use a different query.'
+                }
         
         except Exception as e:
             logger.error(f"Error performing web search: {str(e)}")
