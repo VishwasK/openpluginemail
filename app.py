@@ -519,7 +519,7 @@ class WebSearchPlugin:
             dict: Result with success status, search results, and summary
         """
         try:
-            if not DDGS_AVAILABLE or not self.ddgs:
+            if not DDGS_AVAILABLE or not self.ddgs_available:
                 return {
                     'success': False,
                     'error': 'DuckDuckGo search not available. Please ensure duckduckgo-search package is installed.'
@@ -541,6 +541,13 @@ class WebSearchPlugin:
             search_result = self.search(query, max_results=max_results)
             if not search_result['success']:
                 return search_result
+            
+            # Check if we have search results
+            if not search_result.get('results') or len(search_result['results']) == 0:
+                return {
+                    'success': False,
+                    'error': 'No search results found. Cannot generate summary without search results. Try a different query or check your search terms.'
+                }
             
             # Format search results for LLM
             context = f"Web search results for: {query}\n\n"
