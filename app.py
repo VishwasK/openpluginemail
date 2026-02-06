@@ -453,30 +453,65 @@ class WebSearchPlugin:
             
             # Create fresh DDGS instance for each search (some versions have issues with reuse)
             try:
+                logger.info(f"Starting search for query: '{query}', max_results: {max_results}, region: {region}")
                 ddgs = DDGS()
+                logger.info("DDGS instance created successfully")
+                
                 # Perform search - DuckDuckGo returns an iterator
+                logger.info("Calling ddgs.text()...")
                 results = ddgs.text(query, max_results=max_results, region=region)
+                logger.info(f"ddgs.text() returned: {type(results)}")
                 
                 # Convert iterator to list and format results
                 formatted_results = []
-                for i, result in enumerate(results, 1):
-                    # DuckDuckGo returns dicts with 'title', 'href', 'body' keys
-                    formatted_results.append({
-                        "title": result.get("title", ""),
-                        "url": result.get("href", ""),
-                        "snippet": result.get("body", ""),
-                        "rank": i
-                    })
+                result_count = 0
+                
+                try:
+                    for result in results:
+                        result_count += 1
+                        logger.info(f"Processing result {result_count}: {type(result)}, keys: {result.keys() if isinstance(result, dict) else 'not a dict'}")
+                        
+                        # DuckDuckGo returns dicts with 'title', 'href', 'body' keys
+                        title = result.get("title", "") if isinstance(result, dict) else getattr(result, "title", "")
+                        url = result.get("href", "") if isinstance(result, dict) else getattr(result, "href", "")
+                        snippet = result.get("body", "") if isinstance(result, dict) else getattr(result, "body", "")
+                        
+                        logger.info(f"Result {result_count} - Title: {title[:50]}..., URL: {url[:50]}...")
+                        
+                        formatted_results.append({
+                            "title": title,
+                            "url": url,
+                            "snippet": snippet,
+                            "rank": result_count
+                        })
+                        
+                        # Limit to max_results
+                        if result_count >= max_results:
+                            break
+                            
+                except StopIteration:
+                    logger.info("Iterator exhausted (StopIteration)")
+                except Exception as iter_error:
+                    logger.error(f"Error iterating results: {str(iter_error)}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                
+                logger.info(f"Processed {result_count} results, formatted {len(formatted_results)} results")
                 
                 # Check if we got results
                 if not formatted_results or len(formatted_results) == 0:
-                    logger.warning(f"No results found for query: {query}")
+                    logger.warning(f"No results found for query: {query} (processed {result_count} raw results)")
                     return {
                         'success': True,
                         'query': query,
                         'results': [],
                         'count': 0,
-                        'message': 'No results found. Try a different search query.'
+                        'message': 'No results found. Try a different search query.',
+                        'debug': {
+                            'raw_result_count': result_count,
+                            'ddgs_type': str(type(ddgs)),
+                            'query': query
+                        }
                     }
                 
                 logger.info(f"Web search completed for: {query} ({len(formatted_results)} results)")
@@ -491,10 +526,15 @@ class WebSearchPlugin:
                 logger.error(f"DuckDuckGo search error: {str(search_error)}")
                 # Log the full error for debugging
                 import traceback
-                logger.error(traceback.format_exc())
+                error_trace = traceback.format_exc()
+                logger.error(error_trace)
                 return {
                     'success': False,
-                    'error': f'Search failed: {str(search_error)}. Please try again or use a different query.'
+                    'error': f'Search failed: {str(search_error)}. Please try again or use a different query.',
+                    'debug': {
+                        'error_type': type(search_error).__name__,
+                        'traceback': error_trace
+                    }
                 }
         
         except Exception as e:
@@ -538,15 +578,24 @@ class WebSearchPlugin:
                 }
             
             # Perform search
+            logger.info(f"Starting search_and_summarize for query: '{query}'")
             search_result = self.search(query, max_results=max_results)
+            logger.info(f"Search result: success={search_result.get('success')}, count={search_result.get('count', 0)}")
+            
             if not search_result['success']:
+                logger.error(f"Search failed: {search_result.get('error')}")
                 return search_result
             
             # Check if we have search results
             if not search_result.get('results') or len(search_result['results']) == 0:
+                logger.warning(f"No search results found for query: '{query}'")
+                error_msg = 'No search results found. Cannot generate summary without search results. '
+                if search_result.get('debug'):
+                    error_msg += f"Debug info: {search_result.get('debug')}"
                 return {
                     'success': False,
-                    'error': 'No search results found. Cannot generate summary without search results. Try a different query or check your search terms.'
+                    'error': error_msg + 'Try a different query or check your search terms.',
+                    'debug': search_result.get('debug', {})
                 }
             
             # Format search results for LLM
