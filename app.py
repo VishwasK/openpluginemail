@@ -542,6 +542,15 @@ class WebSearchPlugin:
                         'traceback': error_trace
                     }
                 }
+        
+        except Exception as e:
+            logger.error(f"Error performing web search: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {
+                'success': False,
+                'error': str(e)
+            }
     
     def search_and_summarize(self, query, api_key, max_results=5, focus=None, model="gpt-5-nano"):
         """
