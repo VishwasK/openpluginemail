@@ -498,44 +498,53 @@ class WebSearchPlugin:
                 
                 logger.info(f"Processed {result_count} results, formatted {len(formatted_results)} results")
                 
-                # Check if we got results
-                if not formatted_results or len(formatted_results) == 0:
-                    logger.warning(f"No results found for query: {query} (processed {result_count} raw results)")
-                    return {
-                        'success': True,
-                        'query': query,
-                        'results': [],
-                        'count': 0,
-                        'message': 'No results found. Try a different search query.',
-                        'debug': {
-                            'raw_result_count': result_count,
-                            'ddgs_type': str(type(ddgs)),
-                            'query': query
-                        }
-                    }
-                
-                logger.info(f"Web search completed for: {query} ({len(formatted_results)} results)")
-                return {
-                    'success': True,
-                    'query': query,
-                    'results': formatted_results,
-                    'count': len(formatted_results)
-                }
-                
-            except Exception as search_error:
-                logger.error(f"DuckDuckGo search error: {str(search_error)}")
-                # Log the full error for debugging
-                import traceback
-                error_trace = traceback.format_exc()
-                logger.error(error_trace)
+            # Check if we got results after all retries
+            if not formatted_results or len(formatted_results) == 0:
+                logger.warning(f"No results found for query: {query} after {max_retries} attempts (processed {result_count} raw results)")
+                error_msg = (
+                    "DuckDuckGo search returned zero results. This is likely due to:\n"
+                    "1. Rate limiting or IP blocking on Heroku\n"
+                    "2. DuckDuckGo blocking automated requests\n"
+                    "3. Network restrictions\n\n"
+                    "Consider using a different search provider or running locally."
+                )
                 return {
                     'success': False,
-                    'error': f'Search failed: {str(search_error)}. Please try again or use a different query.',
+                    'query': query,
+                    'results': [],
+                    'count': 0,
+                    'error': error_msg,
                     'debug': {
-                        'error_type': type(search_error).__name__,
-                        'traceback': error_trace
+                        'raw_result_count': result_count,
+                        'attempts': max_retries,
+                        'last_error': last_error,
+                        'query': query
                     }
                 }
+            
+            logger.info(f"Web search completed for: {query} ({len(formatted_results)} results)")
+            return {
+                'success': True,
+                'query': query,
+                'results': formatted_results,
+                'count': len(formatted_results)
+            }
+                
+        except Exception as search_error:
+            logger.error(f"DuckDuckGo search error after retries: {str(search_error)}")
+            # Log the full error for debugging
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(error_trace)
+            return {
+                'success': False,
+                'error': f'Search failed after retries: {str(search_error)}. DuckDuckGo may be blocking requests from Heroku. Consider using a different search provider.',
+                'debug': {
+                    'error_type': type(search_error).__name__,
+                    'traceback': error_trace,
+                    'last_error': last_error
+                }
+            }
         
         except Exception as e:
             logger.error(f"Error performing web search: {str(e)}")
