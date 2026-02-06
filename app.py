@@ -230,51 +230,80 @@ class StoryPlugin:
             try:
                 # gpt-5-nano uses responses.create() API, others use chat.completions.create()
                 if model == "gpt-5-nano":
-                    response = client.responses.create(
-                        model=model,
-                        input=[
-                            {
-                                "role": "user",
-                                "content": [
+                    # Check if responses API is available
+                    if not hasattr(client, 'responses'):
+                        logger.warning("responses API not available, falling back to chat.completions")
+                        # Fallback to chat completions
+                        response = client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt}
+                            ],
+                            temperature=0.8,
+                            max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
+                        )
+                        story = response.choices[0].message.content
+                    else:
+                        try:
+                            response = client.responses.create(
+                                model=model,
+                                input=[
                                     {
-                                        "type": "input_text",
-                                        "text": f"{system_prompt}\n\n{user_prompt}"
+                                        "role": "user",
+                                        "content": [
+                                            {
+                                                "type": "input_text",
+                                                "text": f"{system_prompt}\n\n{user_prompt}"
+                                            }
+                                        ]
                                     }
-                                ]
-                            }
-                        ],
-                        text={
-                            "format": {
-                                "type": "text"
-                            },
-                            "verbosity": "medium"
-                        },
-                        reasoning={
-                            "effort": "medium"
-                        },
-                        tools=[],
-                        store=True
-                    )
-                    # Extract text from response - find assistant message in input array
-                    story = None
-                    if hasattr(response, 'input') and response.input:
-                        for item in response.input:
-                            # Handle both dict and object formats
-                            role = item.get('role', '') if isinstance(item, dict) else getattr(item, 'role', '')
-                            if role == 'assistant':
-                                content = item.get('content', []) if isinstance(item, dict) else getattr(item, 'content', [])
-                                for content_item in content:
-                                    content_type = content_item.get('type', '') if isinstance(content_item, dict) else getattr(content_item, 'type', '')
-                                    if content_type == 'output_text':
-                                        story = content_item.get('text', '') if isinstance(content_item, dict) else getattr(content_item, 'text', '')
-                                        break
-                                if story:
-                                    break
-                    
-                    if not story:
-                        # Fallback: try to get text from response
-                        logger.warning(f"Could not extract text from gpt-5-nano response, using string representation")
-                        story = str(response)
+                                ],
+                                text={
+                                    "format": {
+                                        "type": "text"
+                                    },
+                                    "verbosity": "medium"
+                                },
+                                reasoning={
+                                    "effort": "medium"
+                                },
+                                tools=[],
+                                store=True
+                            )
+                            # Extract text from response - find assistant message in input array
+                            story = None
+                            if hasattr(response, 'input') and response.input:
+                                for item in response.input:
+                                    # Handle both dict and object formats
+                                    role = item.get('role', '') if isinstance(item, dict) else getattr(item, 'role', '')
+                                    if role == 'assistant':
+                                        content = item.get('content', []) if isinstance(item, dict) else getattr(item, 'content', [])
+                                        for content_item in content:
+                                            content_type = content_item.get('type', '') if isinstance(content_item, dict) else getattr(content_item, 'type', '')
+                                            if content_type == 'output_text':
+                                                story = content_item.get('text', '') if isinstance(content_item, dict) else getattr(content_item, 'text', '')
+                                                break
+                                        if story:
+                                            break
+                            
+                            if not story:
+                                # Fallback: try to get text from response
+                                logger.warning(f"Could not extract text from gpt-5-nano response, using string representation")
+                                story = str(response)
+                        except AttributeError as attr_err:
+                            logger.warning(f"responses.create() not available: {str(attr_err)}, falling back to chat.completions")
+                            # Fallback to chat completions
+                            response = client.chat.completions.create(
+                                model=model,
+                                messages=[
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": user_prompt}
+                                ],
+                                temperature=0.8,
+                                max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
+                            )
+                            story = response.choices[0].message.content
                 else:
                     # Standard chat completions API for other models
                     response = client.chat.completions.create(
@@ -359,49 +388,76 @@ class StoryPlugin:
             try:
                 # gpt-5-nano uses responses.create() API, others use chat.completions.create()
                 if model == "gpt-5-nano":
-                    response = client.responses.create(
-                        model=model,
-                        input=[
-                            {
-                                "role": "user",
-                                "content": [
+                    # Check if responses API is available
+                    if not hasattr(client, 'responses'):
+                        logger.warning("responses API not available, falling back to chat.completions")
+                        response = client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt}
+                            ],
+                            temperature=0.8,
+                            max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
+                        )
+                        continuation = response.choices[0].message.content
+                    else:
+                        try:
+                            response = client.responses.create(
+                                model=model,
+                                input=[
                                     {
-                                        "type": "input_text",
-                                        "text": f"{system_prompt}\n\n{user_prompt}"
+                                        "role": "user",
+                                        "content": [
+                                            {
+                                                "type": "input_text",
+                                                "text": f"{system_prompt}\n\n{user_prompt}"
+                                            }
+                                        ]
                                     }
-                                ]
-                            }
-                        ],
-                        text={
-                            "format": {
-                                "type": "text"
-                            },
-                            "verbosity": "medium"
-                        },
-                        reasoning={
-                            "effort": "medium"
-                        },
-                        tools=[],
-                        store=True
-                    )
-                    # Extract text from response - find assistant message in input array
-                    continuation = None
-                    if hasattr(response, 'input') and response.input:
-                        for item in response.input:
-                            # Handle both dict and object formats
-                            role = item.get('role', '') if isinstance(item, dict) else getattr(item, 'role', '')
-                            if role == 'assistant':
-                                content = item.get('content', []) if isinstance(item, dict) else getattr(item, 'content', [])
-                                for content_item in content:
-                                    content_type = content_item.get('type', '') if isinstance(content_item, dict) else getattr(content_item, 'type', '')
-                                    if content_type == 'output_text':
-                                        continuation = content_item.get('text', '') if isinstance(content_item, dict) else getattr(content_item, 'text', '')
-                                        break
-                                if continuation:
-                                    break
-                    if not continuation:
-                        logger.warning(f"Could not extract text from gpt-5-nano response, using string representation")
-                        continuation = str(response)
+                                ],
+                                text={
+                                    "format": {
+                                        "type": "text"
+                                    },
+                                    "verbosity": "medium"
+                                },
+                                reasoning={
+                                    "effort": "medium"
+                                },
+                                tools=[],
+                                store=True
+                            )
+                            # Extract text from response - find assistant message in input array
+                            continuation = None
+                            if hasattr(response, 'input') and response.input:
+                                for item in response.input:
+                                    # Handle both dict and object formats
+                                    role = item.get('role', '') if isinstance(item, dict) else getattr(item, 'role', '')
+                                    if role == 'assistant':
+                                        content = item.get('content', []) if isinstance(item, dict) else getattr(item, 'content', [])
+                                        for content_item in content:
+                                            content_type = content_item.get('type', '') if isinstance(content_item, dict) else getattr(content_item, 'type', '')
+                                            if content_type == 'output_text':
+                                                continuation = content_item.get('text', '') if isinstance(content_item, dict) else getattr(content_item, 'text', '')
+                                                break
+                                        if continuation:
+                                            break
+                            if not continuation:
+                                logger.warning(f"Could not extract text from gpt-5-nano response, using string representation")
+                                continuation = str(response)
+                        except AttributeError as attr_err:
+                            logger.warning(f"responses.create() not available: {str(attr_err)}, falling back to chat.completions")
+                            response = client.chat.completions.create(
+                                model=model,
+                                messages=[
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": user_prompt}
+                                ],
+                                temperature=0.8,
+                                max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
+                            )
+                            continuation = response.choices[0].message.content
                 else:
                     # Standard chat completions API for other models
                     response = client.chat.completions.create(
@@ -484,49 +540,76 @@ class StoryPlugin:
             try:
                 # gpt-5-nano uses responses.create() API, others use chat.completions.create()
                 if model == "gpt-5-nano":
-                    response = client.responses.create(
-                        model=model,
-                        input=[
-                            {
-                                "role": "user",
-                                "content": [
+                    # Check if responses API is available
+                    if not hasattr(client, 'responses'):
+                        logger.warning("responses API not available, falling back to chat.completions")
+                        response = client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt}
+                            ],
+                            temperature=0.7,
+                            max_tokens=4000
+                        )
+                        improved = response.choices[0].message.content
+                    else:
+                        try:
+                            response = client.responses.create(
+                                model=model,
+                                input=[
                                     {
-                                        "type": "input_text",
-                                        "text": f"{system_prompt}\n\n{user_prompt}"
+                                        "role": "user",
+                                        "content": [
+                                            {
+                                                "type": "input_text",
+                                                "text": f"{system_prompt}\n\n{user_prompt}"
+                                            }
+                                        ]
                                     }
-                                ]
-                            }
-                        ],
-                        text={
-                            "format": {
-                                "type": "text"
-                            },
-                            "verbosity": "medium"
-                        },
-                        reasoning={
-                            "effort": "medium"
-                        },
-                        tools=[],
-                        store=True
-                    )
-                    # Extract text from response - find assistant message in input array
-                    improved = None
-                    if hasattr(response, 'input') and response.input:
-                        for item in response.input:
-                            # Handle both dict and object formats
-                            role = item.get('role', '') if isinstance(item, dict) else getattr(item, 'role', '')
-                            if role == 'assistant':
-                                content = item.get('content', []) if isinstance(item, dict) else getattr(item, 'content', [])
-                                for content_item in content:
-                                    content_type = content_item.get('type', '') if isinstance(content_item, dict) else getattr(content_item, 'type', '')
-                                    if content_type == 'output_text':
-                                        improved = content_item.get('text', '') if isinstance(content_item, dict) else getattr(content_item, 'text', '')
-                                        break
-                                if improved:
-                                    break
-                    if not improved:
-                        logger.warning(f"Could not extract text from gpt-5-nano response, using string representation")
-                        improved = str(response)
+                                ],
+                                text={
+                                    "format": {
+                                        "type": "text"
+                                    },
+                                    "verbosity": "medium"
+                                },
+                                reasoning={
+                                    "effort": "medium"
+                                },
+                                tools=[],
+                                store=True
+                            )
+                            # Extract text from response - find assistant message in input array
+                            improved = None
+                            if hasattr(response, 'input') and response.input:
+                                for item in response.input:
+                                    # Handle both dict and object formats
+                                    role = item.get('role', '') if isinstance(item, dict) else getattr(item, 'role', '')
+                                    if role == 'assistant':
+                                        content = item.get('content', []) if isinstance(item, dict) else getattr(item, 'content', [])
+                                        for content_item in content:
+                                            content_type = content_item.get('type', '') if isinstance(content_item, dict) else getattr(content_item, 'type', '')
+                                            if content_type == 'output_text':
+                                                improved = content_item.get('text', '') if isinstance(content_item, dict) else getattr(content_item, 'text', '')
+                                                break
+                                        if improved:
+                                            break
+                            if not improved:
+                                logger.warning(f"Could not extract text from gpt-5-nano response, using string representation")
+                                improved = str(response)
+                        except AttributeError as attr_err:
+                            logger.warning(f"responses.create() not available: {str(attr_err)}, falling back to chat.completions")
+                            response = client.chat.completions.create(
+                                model=model,
+                                messages=[
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": user_prompt}
+                                ],
+                                temperature=0.7,
+                                max_tokens=4000
+                            )
+                            improved = response.choices[0].message.content
                 else:
                     # Standard chat completions API for other models
                     response = client.chat.completions.create(
