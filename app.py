@@ -180,7 +180,7 @@ class StoryPlugin:
     def __init__(self):
         pass
     
-    def write_story(self, prompt, api_key, genre=None, length="medium", tone=None, model="gpt-4"):
+    def write_story(self, prompt, api_key, genre=None, length="medium", tone=None, model="gpt-5-nano"):
         """
         Write a new story using OpenAI
         
@@ -190,7 +190,7 @@ class StoryPlugin:
             genre: Story genre (optional)
             length: Story length - short, medium, long (default: medium)
             tone: Story tone (optional)
-            model: OpenAI model to use (default: gpt-4)
+            model: OpenAI model to use (default: gpt-5-nano)
         
         Returns:
             dict: Result with success status and story text
@@ -254,7 +254,7 @@ class StoryPlugin:
                 'error': str(e)
             }
     
-    def continue_story(self, story, api_key, direction=None, length="medium", model="gpt-4"):
+    def continue_story(self, story, api_key, direction=None, length="medium", model="gpt-5-nano"):
         """
         Continue an existing story
         
@@ -322,7 +322,7 @@ class StoryPlugin:
                 'error': str(e)
             }
     
-    def improve_story(self, story, api_key, focus=None, style=None, model="gpt-4"):
+    def improve_story(self, story, api_key, focus=None, style=None, model="gpt-5-nano"):
         """
         Improve an existing story
         
@@ -450,18 +450,46 @@ class WebSearchPlugin:
                     'error': 'Search query is required'
                 }
             
-            # Perform search
-            results = self.ddgs.text(query, max_results=max_results, region=region)
+            # Perform search - DuckDuckGo returns an iterator, convert to list
+            try:
+                results = list(self.ddgs.text(query, max_results=max_results, region=region))
+            except Exception as search_error:
+                logger.error(f"DuckDuckGo search error: {str(search_error)}")
+                return {
+                    'success': False,
+                    'error': f'Search failed: {str(search_error)}'
+                }
+            
+            # Check if we got results
+            if not results or len(results) == 0:
+                logger.warning(f"No results found for query: {query}")
+                return {
+                    'success': True,
+                    'query': query,
+                    'results': [],
+                    'count': 0,
+                    'message': 'No results found. Try a different search query.'
+                }
             
             # Format results
             formatted_results = []
             for i, result in enumerate(results, 1):
-                formatted_results.append({
-                    "title": result.get("title", ""),
-                    "url": result.get("href", ""),
-                    "snippet": result.get("body", ""),
-                    "rank": i
-                })
+                # Handle both dict and object results
+                if isinstance(result, dict):
+                    formatted_results.append({
+                        "title": result.get("title", ""),
+                        "url": result.get("href", result.get("url", "")),
+                        "snippet": result.get("body", result.get("snippet", "")),
+                        "rank": i
+                    })
+                else:
+                    # Handle object-style results
+                    formatted_results.append({
+                        "title": getattr(result, "title", ""),
+                        "url": getattr(result, "href", getattr(result, "url", "")),
+                        "snippet": getattr(result, "body", getattr(result, "snippet", "")),
+                        "rank": i
+                    })
             
             logger.info(f"Web search completed for: {query} ({len(formatted_results)} results)")
             return {
@@ -478,7 +506,7 @@ class WebSearchPlugin:
                 'error': str(e)
             }
     
-    def search_and_summarize(self, query, api_key, max_results=5, focus=None, model="gpt-4"):
+    def search_and_summarize(self, query, api_key, max_results=5, focus=None, model="gpt-5-nano"):
         """
         Search the web and get an LLM-powered summary
         
@@ -487,7 +515,7 @@ class WebSearchPlugin:
             api_key: OpenAI API key for summarization
             max_results: Number of search results to use (default: 5)
             focus: What to focus on in the summary (optional)
-            model: OpenAI model to use (default: gpt-4)
+            model: OpenAI model to use (default: gpt-5-nano)
         
         Returns:
             dict: Result with success status, search results, and summary
@@ -696,7 +724,7 @@ def write_story():
             genre=data.get('genre'),
             length=data.get('length', 'medium'),
             tone=data.get('tone'),
-            model=data.get('model', 'gpt-4')
+            model=data.get('model', 'gpt-5-nano')
         )
         
         if result['success']:
@@ -739,7 +767,7 @@ def continue_story():
             api_key=api_key,
             direction=data.get('direction'),
             length=data.get('length', 'medium'),
-            model=data.get('model', 'gpt-4')
+            model=data.get('model', 'gpt-5-nano')
         )
         
         if result['success']:
@@ -782,7 +810,7 @@ def improve_story():
             api_key=api_key,
             focus=data.get('focus'),
             style=data.get('style'),
-            model=data.get('model', 'gpt-4')
+            model=data.get('model', 'gpt-5-nano')
         )
         
         if result['success']:
@@ -864,7 +892,7 @@ def web_search_summarize():
             api_key=api_key,
             max_results=data.get('max_results', 5),
             focus=data.get('focus'),
-            model=data.get('model', 'gpt-4')
+            model=data.get('model', 'gpt-5-nano')
         )
         
         if result['success']:

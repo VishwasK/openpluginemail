@@ -255,7 +255,7 @@ function togglePasswordVisibility(inputId, button) {
 function loadOpenAICredentials() {
     try {
         const apiKey = localStorage.getItem(OPENAI_KEY);
-        const model = localStorage.getItem(OPENAI_MODEL_KEY) || 'gpt-4';
+        const model = localStorage.getItem(OPENAI_MODEL_KEY) || 'gpt-5-nano';
         
         if (apiKey) {
             const apiKeyInput = document.getElementById('openaiApiKey');
