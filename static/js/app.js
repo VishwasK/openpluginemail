@@ -559,22 +559,39 @@ document.getElementById('webSearchForm').addEventListener('submit', async (e) =>
         resultDiv.style.display = 'block';
         
         if (data.success) {
-            resultDiv.className = 'story-result success';
-            let html = `<h3>Search Results for: "${data.query}"</h3>`;
-            html += `<p><strong>Found ${data.count} results:</strong></p>`;
-            
-            data.results.forEach((result, index) => {
-                html += `<div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid var(--primary-color);">`;
-                html += `<h4 style="margin-top: 0;">${index + 1}. ${result.title}</h4>`;
-                html += `<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 5px 0;"><a href="${result.url}" target="_blank" style="color: var(--primary-color);">${result.url}</a></p>`;
-                html += `<p style="margin: 10px 0;">${result.snippet}</p>`;
-                html += `</div>`;
-            });
-            
-            resultDiv.innerHTML = html;
+            if (data.count === 0) {
+                resultDiv.className = 'story-result error';
+                let html = `<h3>No Results Found</h3>`;
+                html += `<p>Search query: "${data.query}"</p>`;
+                html += `<p>No results were returned. This could be due to:</p>`;
+                html += `<ul><li>DuckDuckGo rate limiting</li><li>Network issues</li><li>Query too specific</li></ul>`;
+                if (data.debug) {
+                    html += `<details style="margin-top: 10px;"><summary>Debug Info</summary><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
+                }
+                html += `<p><strong>Try:</strong> A different search query or check Heroku logs for more details.</p>`;
+                resultDiv.innerHTML = html;
+            } else {
+                resultDiv.className = 'story-result success';
+                let html = `<h3>Search Results for: "${data.query}"</h3>`;
+                html += `<p><strong>Found ${data.count} results:</strong></p>`;
+                
+                data.results.forEach((result, index) => {
+                    html += `<div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid var(--primary-color);">`;
+                    html += `<h4 style="margin-top: 0;">${index + 1}. ${result.title}</h4>`;
+                    html += `<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 5px 0;"><a href="${result.url}" target="_blank" style="color: var(--primary-color);">${result.url}</a></p>`;
+                    html += `<p style="margin: 10px 0;">${result.snippet}</p>`;
+                    html += `</div>`;
+                });
+                
+                resultDiv.innerHTML = html;
+            }
         } else {
             resultDiv.className = 'story-result error';
-            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to search'}`;
+            let errorHtml = `✗ Error: ${data.error || 'Failed to search'}`;
+            if (data.debug) {
+                errorHtml += `<details style="margin-top: 10px;"><summary>Debug Info</summary><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
+            }
+            resultDiv.innerHTML = errorHtml;
         }
     } catch (error) {
         resultDiv.style.display = 'block';

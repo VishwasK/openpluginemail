@@ -886,6 +886,27 @@ def websearch_plugin_info():
     return jsonify(websearch_plugin.get_plugin_info())
 
 
+@app.route('/api/websearch/test', methods=['GET'])
+def test_web_search():
+    """Test endpoint to debug web search"""
+    test_query = request.args.get('query', 'Python programming')
+    try:
+        result = websearch_plugin.search(query=test_query, max_results=3)
+        return jsonify({
+            'test_query': test_query,
+            'result': result,
+            'ddgs_available': DDGS_AVAILABLE,
+            'ddgs_plugin_available': websearch_plugin.ddgs_available if hasattr(websearch_plugin, 'ddgs_available') else False
+        }), 200
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'ddgs_available': DDGS_AVAILABLE
+        }), 500
+
+
 @app.route('/api/websearch/search', methods=['POST'])
 def web_search():
     """Web search endpoint"""
