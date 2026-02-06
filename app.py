@@ -227,17 +227,29 @@ class StoryPlugin:
                 user_prompt += f"\nTone: {tone}"
             
             # Generate story
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.8,
-                max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
-            )
-            
-            story = response.choices[0].message.content
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.8,
+                    max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
+                )
+                
+                story = response.choices[0].message.content
+            except Exception as api_error:
+                logger.error(f"OpenAI API error: {str(api_error)}")
+                import traceback
+                logger.error(traceback.format_exc())
+                # Check if it's a model not found error
+                if "model" in str(api_error).lower() and ("not found" in str(api_error).lower() or "invalid" in str(api_error).lower()):
+                    return {
+                        'success': False,
+                        'error': f'Invalid model "{model}". Please use a valid OpenAI model like "gpt-4", "gpt-4-turbo-preview", or "gpt-3.5-turbo". Error: {str(api_error)}'
+                    }
+                raise
             
             logger.info(f"Story written successfully (length: {length})")
             return {
@@ -296,17 +308,28 @@ class StoryPlugin:
             if length:
                 user_prompt += f"\nLength: {length}"
             
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.8,
-                max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
-            )
-            
-            continuation = response.choices[0].message.content
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.8,
+                    max_tokens=2000 if length == "short" else 3000 if length == "medium" else 4000
+                )
+                
+                continuation = response.choices[0].message.content
+            except Exception as api_error:
+                logger.error(f"OpenAI API error in continue_story: {str(api_error)}")
+                import traceback
+                logger.error(traceback.format_exc())
+                if "model" in str(api_error).lower() and ("not found" in str(api_error).lower() or "invalid" in str(api_error).lower()):
+                    return {
+                        'success': False,
+                        'error': f'Invalid model "{model}". Please use a valid OpenAI model. Error: {str(api_error)}'
+                    }
+                raise
             
             logger.info(f"Story continued successfully")
             return {
@@ -364,17 +387,28 @@ class StoryPlugin:
             if style:
                 user_prompt += f"\nStyle: {style}"
             
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.7,
-                max_tokens=4000
-            )
-            
-            improved = response.choices[0].message.content
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=4000
+                )
+                
+                improved = response.choices[0].message.content
+            except Exception as api_error:
+                logger.error(f"OpenAI API error in improve_story: {str(api_error)}")
+                import traceback
+                logger.error(traceback.format_exc())
+                if "model" in str(api_error).lower() and ("not found" in str(api_error).lower() or "invalid" in str(api_error).lower()):
+                    return {
+                        'success': False,
+                        'error': f'Invalid model "{model}". Please use a valid OpenAI model. Error: {str(api_error)}'
+                    }
+                raise
             
             logger.info(f"Story improved successfully")
             return {

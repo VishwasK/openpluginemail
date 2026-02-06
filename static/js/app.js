@@ -367,6 +367,13 @@ document.getElementById('storyForm').addEventListener('submit', async (e) => {
             })
         });
         
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+        }
+        
         const data = await response.json();
         resultDiv.style.display = 'block';
         
@@ -425,6 +432,13 @@ document.getElementById('continueStoryForm').addEventListener('submit', async (e
             })
         });
         
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+        }
+        
         const data = await response.json();
         resultDiv.style.display = 'block';
         
@@ -482,6 +496,13 @@ document.getElementById('improveStoryForm').addEventListener('submit', async (e)
                 openai_api_key: creds.apiKey
             })
         });
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+        }
         
         const data = await response.json();
         resultDiv.style.display = 'block';
