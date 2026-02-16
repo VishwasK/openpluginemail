@@ -24,6 +24,27 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# Global JSON error handlers -- prevents Flask from returning HTML error pages
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logger.error(f"Unhandled exception: {str(e)}")
+    return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 500
+
+@app.errorhandler(404)
+def not_found(e):
+    if request.path.startswith('/api/') or request.path == '/callback':
+        return jsonify({'success': False, 'error': 'Endpoint not found'}), 404
+    return render_template('index.html')
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+@app.errorhandler(503)
+def service_unavailable(e):
+    return jsonify({'success': False, 'error': 'Service temporarily unavailable'}), 503
+
 # Import OpenAI with error handling
 try:
     from openai import OpenAI
@@ -111,7 +132,7 @@ class EmailPlugin:
                 msg.attach(MIMEText(body, 'plain'))
             
             # Send email (credentials are used here but never stored or logged)
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
+            with smtplib.SMTP(smtp_server, smtp_port, timeout=20) as server:
                 server.starttls()
                 try:
                     server.login(smtp_username, smtp_password)
@@ -223,11 +244,11 @@ class StoryPlugin:
                     'error': 'OpenAI API key not provided'
                 }
             
-            # Initialize OpenAI client with explicit parameters
+            # Initialize OpenAI client -- timeout must be under Heroku's 30s request limit
             client = OpenAI(
                 api_key=api_key,
-                timeout=60.0,
-                max_retries=2
+                timeout=25.0,
+                max_retries=0
             )
             
             # Build the prompt
@@ -388,8 +409,8 @@ class StoryPlugin:
             # Initialize OpenAI client with explicit parameters
             client = OpenAI(
                 api_key=api_key,
-                timeout=60.0,
-                max_retries=2
+                timeout=25.0,
+                max_retries=0
             )
             
             system_prompt = "You are a creative writing assistant. Continue stories seamlessly, maintaining style, tone, and character consistency."
@@ -540,8 +561,8 @@ class StoryPlugin:
             # Initialize OpenAI client with explicit parameters
             client = OpenAI(
                 api_key=api_key,
-                timeout=60.0,
-                max_retries=2
+                timeout=25.0,
+                max_retries=0
             )
             
             system_prompt = "You are an expert editor and writing coach. Improve stories by enhancing descriptions, dialogue, pacing, and overall writing quality while maintaining the original plot and characters."
@@ -888,8 +909,8 @@ class WebSearchPlugin:
             # Generate summary using OpenAI
             client = OpenAI(
                 api_key=api_key,
-                timeout=60.0,
-                max_retries=2
+                timeout=25.0,
+                max_retries=0
             )
             
             system_prompt = "You are a helpful assistant that summarizes web search results to answer questions clearly and accurately."
