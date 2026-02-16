@@ -1660,20 +1660,35 @@ def salesforce_test_connection():
             
             # Initialize Salesforce client with user-provided credentials
             # Security token is optional - only include if provided
+            username = sf_config.get('username', '').strip()
+            password = sf_config.get('password', '').strip()
+            domain = sf_config.get('domain', 'login').strip() or 'login'
+            
+            if not username or not password:
+                return jsonify({
+                    'success': False,
+                    'error': 'Username and password cannot be empty'
+                }), 400
+            
             sf_kwargs = {
-                'username': sf_config.get('username'),
-                'password': sf_config.get('password'),
-                'domain': sf_config.get('domain', 'login')
+                'username': username,
+                'password': password,
+                'domain': domain
             }
             
             # Only add security_token if provided and not empty
-            if sf_config.get('security_token'):
-                sf_kwargs['security_token'] = sf_config.get('security_token')
+            security_token = sf_config.get('security_token', '').strip() if sf_config.get('security_token') else None
+            if security_token:
+                sf_kwargs['security_token'] = security_token
             
             # Only add OAuth credentials if provided
-            if sf_config.get('client_id') and sf_config.get('client_secret'):
-                sf_kwargs['consumer_key'] = sf_config.get('client_id')
-                sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
+            client_id = sf_config.get('client_id', '').strip() if sf_config.get('client_id') else None
+            client_secret = sf_config.get('client_secret', '').strip() if sf_config.get('client_secret') else None
+            if client_id and client_secret:
+                sf_kwargs['consumer_key'] = client_id
+                sf_kwargs['consumer_secret'] = client_secret
+            
+            logger.info(f"Attempting Salesforce connection with username: {username}, domain: {domain}, has_token: {bool(security_token)}, has_oauth: {bool(client_id and client_secret)}")
             
             sf = Salesforce(**sf_kwargs)
             

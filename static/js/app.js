@@ -586,14 +586,26 @@ function loadSalesforceCredentials() {
 }
 
 function saveSalesforceCredentials() {
+    const username = document.getElementById('sfUsername').value.trim();
+    const password = document.getElementById('sfPassword').value;
+    const securityToken = document.getElementById('sfSecurityToken').value.trim();
+    const clientId = document.getElementById('sfClientId').value.trim();
+    const clientSecret = document.getElementById('sfClientSecret').value;
+    const domain = document.getElementById('sfDomain').value || 'login';
+    
     const credentials = {
-        username: document.getElementById('sfUsername').value.trim(),
-        password: document.getElementById('sfPassword').value,
-        security_token: document.getElementById('sfSecurityToken').value || null,
-        client_id: document.getElementById('sfClientId').value.trim() || null,
-        client_secret: document.getElementById('sfClientSecret').value || null,
-        domain: document.getElementById('sfDomain').value || 'login'
+        username: username,
+        password: password,
+        security_token: securityToken || null,
+        client_id: clientId || null,
+        client_secret: clientSecret || null,
+        domain: domain
     };
+    
+    // Remove null/empty values to avoid sending empty strings
+    if (!credentials.security_token) delete credentials.security_token;
+    if (!credentials.client_id) delete credentials.client_id;
+    if (!credentials.client_secret) delete credentials.client_secret;
     
     if (credentials.username && credentials.password) {
         localStorage.setItem(SALESFORCE_KEY, JSON.stringify(credentials));
@@ -606,18 +618,33 @@ function saveSalesforceCredentials() {
 function getSalesforceCredentials() {
     const saved = localStorage.getItem(SALESFORCE_KEY);
     if (saved) {
-        return JSON.parse(saved);
+        const creds = JSON.parse(saved);
+        // Ensure we don't send empty strings
+        if (creds.security_token === '') delete creds.security_token;
+        if (creds.client_id === '') delete creds.client_id;
+        if (creds.client_secret === '') delete creds.client_secret;
+        return creds;
     }
     
     // Fallback to form values
-    return {
-        username: document.getElementById('sfUsername').value.trim(),
-        password: document.getElementById('sfPassword').value,
-        security_token: document.getElementById('sfSecurityToken').value || null,
-        client_id: document.getElementById('sfClientId').value.trim() || null,
-        client_secret: document.getElementById('sfClientSecret').value || null,
-        domain: document.getElementById('sfDomain').value || 'login'
+    const username = document.getElementById('sfUsername').value.trim();
+    const password = document.getElementById('sfPassword').value;
+    const securityToken = document.getElementById('sfSecurityToken').value.trim();
+    const clientId = document.getElementById('sfClientId').value.trim();
+    const clientSecret = document.getElementById('sfClientSecret').value;
+    const domain = document.getElementById('sfDomain').value || 'login';
+    
+    const creds = {
+        username: username,
+        password: password,
+        domain: domain
     };
+    
+    if (securityToken) creds.security_token = securityToken;
+    if (clientId) creds.client_id = clientId;
+    if (clientSecret) creds.client_secret = clientSecret;
+    
+    return creds;
 }
 
 function clearSalesforceCredentials() {
