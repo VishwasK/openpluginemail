@@ -1414,8 +1414,10 @@ def get_sf_client(sf_config):
 
 @app.route('/api/salesforce/authorize', methods=['POST'])
 def salesforce_authorize():
-    """Initiate OAuth 2.0 Authorization Code flow - returns Salesforce login URL"""
+    """Initiate OAuth 2.0 Authorization Code flow with PKCE - returns Salesforce login URL"""
     try:
+        from itsdangerous import URLSafeTimedSerializer
+
         data = request.get_json()
         client_id = (data.get('client_id') or '').strip()
         client_secret = (data.get('client_secret') or '').strip()
@@ -1430,11 +1432,15 @@ def salesforce_authorize():
             hashlib.sha256(code_verifier.encode('ascii')).digest()
         ).rstrip(b'=').decode('ascii')
 
-        # Store credentials and PKCE verifier in server session for use during callback
-        session['sf_client_id'] = client_id
-        session['sf_client_secret'] = client_secret
-        session['sf_domain'] = domain
-        session['sf_code_verifier'] = code_verifier
+        # Pack all needed data into a signed state token
+        # This survives the Salesforce redirect without relying on cookies/sessions
+        serializer = URLSafeTimedSerializer(app.secret_key)
+        state = serializer.dumps({
+            'cid': client_id,
+            'cs': client_secret,
+            'd': domain,
+            'cv': code_verifier
+        })
 
         login_base = 'test' if domain == 'test' else 'login'
         authorize_url = f"https://{login_base}.salesforce.com/services/oauth2/authorize"
@@ -1447,7 +1453,8 @@ def salesforce_authorize():
             'redirect_uri': callback_url,
             'scope': 'api refresh_token',
             'code_challenge': code_challenge,
-            'code_challenge_method': 'S256'
+            'code_challenge_method': 'S256',
+            'state': state
         }
 
         full_url = f"{authorize_url}?{urlencode(params)}"
@@ -1463,7 +1470,10 @@ def salesforce_authorize():
 def salesforce_callback():
     """Handle OAuth 2.0 callback from Salesforce - exchange code for access token"""
     try:
+        from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+
         code = request.args.get('code')
+        state = request.args.get('state', '')
         error = request.args.get('error')
         error_description = request.args.get('error_description', '')
 
@@ -1478,16 +1488,33 @@ def salesforce_callback():
                                    success=False,
                                    error='No authorization code received from Salesforce.')
 
-        # Retrieve credentials and PKCE verifier from session
-        client_id = session.get('sf_client_id', '')
-        client_secret = session.get('sf_client_secret', '')
-        domain = session.get('sf_domain', 'login')
-        code_verifier = session.get('sf_code_verifier', '')
-
-        if not client_id:
+        # Unpack the state token to retrieve client credentials and PKCE verifier
+        if not state:
             return render_template('callback.html',
                                    success=False,
-                                   error='Session expired. Please try connecting again.')
+                                   error='Missing state parameter. Please try connecting again.')
+
+        try:
+            serializer = URLSafeTimedSerializer(app.secret_key)
+            state_data = serializer.loads(state, max_age=300)
+        except SignatureExpired:
+            return render_template('callback.html',
+                                   success=False,
+                                   error='Authorization timed out (>5 minutes). Please try connecting again.')
+        except BadSignature:
+            return render_template('callback.html',
+                                   success=False,
+                                   error='Invalid state parameter. Please try connecting again.')
+
+        client_id = state_data.get('cid', '')
+        client_secret = state_data.get('cs', '')
+        domain = state_data.get('d', 'login')
+        code_verifier = state_data.get('cv', '')
+
+        if not client_id or not client_secret:
+            return render_template('callback.html',
+                                   success=False,
+                                   error='Missing credentials in state. Please try connecting again.')
 
         # Build token endpoint
         login_base = 'test' if domain == 'test' else 'login'
@@ -1530,12 +1557,6 @@ def salesforce_callback():
                                    error='Did not receive access token from Salesforce.')
 
         logger.info(f"OAuth callback successful. Instance: {instance_url}")
-
-        # Clear session data
-        session.pop('sf_client_id', None)
-        session.pop('sf_client_secret', None)
-        session.pop('sf_domain', None)
-        session.pop('sf_code_verifier', None)
 
         return render_template('callback.html',
                                success=True,
