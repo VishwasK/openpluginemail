@@ -317,6 +317,17 @@ function initTabs() {
         btn.addEventListener('click', () => {
             const targetTab = btn.getAttribute('data-tab');
             
+            if (!targetTab) {
+                console.error('Tab button missing data-tab attribute');
+                return;
+            }
+            
+            const targetElement = document.getElementById(targetTab);
+            if (!targetElement) {
+                console.error(`Tab content element not found: ${targetTab}`);
+                return;
+            }
+            
             // Remove active class from all tabs
             tabBtns.forEach(b => b.classList.remove('active'));
             tabContents.forEach(c => {
@@ -326,10 +337,13 @@ function initTabs() {
             
             // Add active class to clicked tab
             btn.classList.add('active');
-            document.getElementById(targetTab).classList.add('active');
-            document.getElementById(targetTab).style.display = 'block';
+            targetElement.classList.add('active');
+            targetElement.style.display = 'block';
         });
     });
+    
+    // Log for debugging
+    console.log(`Initialized ${tabBtns.length} tabs:`, Array.from(tabBtns).map(b => b.getAttribute('data-tab')));
 }
 
 // Story Writing
