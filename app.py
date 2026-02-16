@@ -1792,6 +1792,7 @@ def salesforce_test_connection():
                     # Try to initialize Salesforce
                     # The library should work with just username/password if IP is whitelisted
                     sf = Salesforce(**sf_kwargs)
+                except Exception as init_err:
                     error_msg = str(init_err)
                     logger.error(f"Error creating Salesforce client: {error_msg}")
                     logger.error(f"Exception type: {type(init_err).__name__}")
