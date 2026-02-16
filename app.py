@@ -1679,20 +1679,15 @@ def salesforce_test_connection():
             else:
                 domain = 'login'
             
-            sf_kwargs = {
-                'username': username,
-                'password': password,
-                'domain': domain
-            }
-            
-            # Only add security_token if provided and not empty
+            # Build Salesforce connection parameters
+            # simple-salesforce requires username and password at minimum
+            # If OAuth credentials are provided, use those; otherwise use username/password
             security_token = None
             if sf_config.get('security_token'):
                 security_token = str(sf_config.get('security_token')).strip()
-                if security_token:
-                    sf_kwargs['security_token'] = security_token
+                if not security_token:
+                    security_token = None
             
-            # Only add OAuth credentials if provided
             client_id = None
             client_secret = None
             if sf_config.get('client_id'):
@@ -1700,9 +1695,29 @@ def salesforce_test_connection():
             if sf_config.get('client_secret'):
                 client_secret = str(sf_config.get('client_secret')).strip()
             
+            # If OAuth credentials provided, use OAuth flow
             if client_id and client_secret:
-                sf_kwargs['consumer_key'] = client_id
-                sf_kwargs['consumer_secret'] = client_secret
+                sf_kwargs = {
+                    'username': username,
+                    'password': password,
+                    'consumer_key': client_id,
+                    'consumer_secret': client_secret,
+                    'domain': domain
+                }
+                if security_token:
+                    sf_kwargs['security_token'] = security_token
+            else:
+                # Standard username/password authentication
+                # Note: security_token is optional if IP is whitelisted
+                sf_kwargs = {
+                    'username': username,
+                    'password': password,
+                    'domain': domain
+                }
+                # Only add security_token if explicitly provided
+                # Some orgs require it even without IP restrictions
+                if security_token:
+                    sf_kwargs['security_token'] = security_token
             
             logger.info(f"Attempting Salesforce connection with username: {username}, domain: {domain}, has_token: {bool(security_token)}, has_oauth: {bool(client_id and client_secret)}")
             logger.info(f"Salesforce kwargs keys: {list(sf_kwargs.keys())}")
@@ -1724,14 +1739,31 @@ def salesforce_test_connection():
             # Try to initialize Salesforce client
             try:
                 # Log the exact kwargs being passed (without password value)
-                safe_kwargs = {k: ('***' if k == 'password' else v) for k, v in sf_kwargs.items()}
+                safe_kwargs = {k: ('***' if k == 'password' or k == 'consumer_secret' else v) for k, v in sf_kwargs.items()}
                 logger.info(f"Calling Salesforce with kwargs: {safe_kwargs}")
                 
+                # Try to initialize Salesforce
+                # The library should work with just username/password if IP is whitelisted
                 sf = Salesforce(**sf_kwargs)
                 
                 # Verify connection by checking if instance_url is set
-                if not hasattr(sf, 'sf_instance_url') or not sf.sf_instance_url:
-                    logger.warning("Salesforce client created but instance_url not set")
+                instance_url = None
+                if hasattr(sf, 'sf_instance_url'):
+                    instance_url = sf.sf_instance_url
+                elif hasattr(sf, 'instance_url'):
+                    instance_url = sf.instance_url
+                elif hasattr(sf, 'base_url'):
+                    instance_url = sf.base_url
+                
+                if not instance_url:
+                    logger.warning("Salesforce client created but instance_url not found")
+                    # Try a test query to verify connection
+                    try:
+                        test_result = sf.query("SELECT Id FROM User LIMIT 1")
+                        logger.info("Connection verified via test query")
+                    except Exception as test_err:
+                        logger.error(f"Test query failed: {str(test_err)}")
+                        raise
                     
             except Exception as init_err:
                 error_msg = str(init_err)
@@ -1742,33 +1774,37 @@ def salesforce_test_connection():
                 
                 # Check if it's the specific error about login information
                 if 'login information' in error_msg.lower() or 'instance and token' in error_msg.lower():
-                    # This error typically means security token is required
+                    # This error can occur even without IP restrictions
+                    # It might be a library issue or credential format issue
+                    logger.error(f"Salesforce initialization failed with 'login information' error")
+                    logger.error(f"Error details: {error_msg}")
+                    logger.error(f"Kwargs passed: {list(sf_kwargs.keys())}")
+                    
+                    # Provide helpful troubleshooting
+                    troubleshooting = []
                     if not security_token:
-                        return jsonify({
-                            'success': False,
-                            'error': 'Security token required. Your IP address is not whitelisted in Salesforce.',
-                            'details': 'You need to provide a security token to authenticate. Get your security token from: Setup → My Personal Information → Reset My Security Token. The token will be emailed to you.',
-                            'solution': 'Add your security token in the "Security Token" field above and try again.',
-                            'debug': {
-                                'username_provided': bool(username),
-                                'password_provided': bool(password),
-                                'security_token_provided': False,
-                                'kwargs_keys': list(sf_kwargs.keys()),
-                                'error_type': 'missing_security_token'
-                            }
-                        }), 401
-                    else:
-                        return jsonify({
-                            'success': False,
-                            'error': 'Salesforce authentication failed. Please verify your credentials.',
-                            'details': 'Username, password, and security token were provided but authentication still failed. Please verify all credentials are correct.',
-                            'debug': {
-                                'username_provided': bool(username),
-                                'password_provided': bool(password),
-                                'security_token_provided': bool(security_token),
-                                'kwargs_keys': list(sf_kwargs.keys())
-                            }
-                        }), 401
+                        troubleshooting.append("Try adding a security token (even if IP is whitelisted, some orgs require it)")
+                    troubleshooting.append("Verify username is your full email address")
+                    troubleshooting.append("Verify password is correct (check for typos)")
+                    troubleshooting.append("Try using OAuth (Client ID/Secret) instead of username/password")
+                    troubleshooting.append("Check if your org requires MFA (Multi-Factor Authentication)")
+                    
+                    return jsonify({
+                        'success': False,
+                        'error': 'Salesforce authentication failed. The library could not authenticate with provided credentials.',
+                        'details': f'Error: {error_msg}. This can occur even without IP restrictions.',
+                        'troubleshooting': troubleshooting,
+                        'solution': 'Try: 1) Add a security token, 2) Verify credentials, 3) Use OAuth instead',
+                        'debug': {
+                            'username_provided': bool(username),
+                            'password_provided': bool(password),
+                            'security_token_provided': bool(security_token),
+                            'oauth_provided': bool(client_id and client_secret),
+                            'kwargs_keys': list(sf_kwargs.keys()),
+                            'error_type': 'authentication_failed',
+                            'raw_error': error_msg
+                        }
+                    }), 401
                 
                 return jsonify({
                     'success': False,

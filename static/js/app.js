@@ -765,6 +765,14 @@ async function testSalesforceConnection(creds = null, showSaveMessage = false) {
                 html += `4. Click "Test Connection" again`;
                 html += `</div>`;
             }
+            if (data.troubleshooting && data.troubleshooting.length > 0) {
+                html += `<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">`;
+                html += `<strong>🔧 Troubleshooting Steps:</strong><ul style="margin: 5px 0 0 20px;">`;
+                data.troubleshooting.forEach(step => {
+                    html += `<li>${step}</li>`;
+                });
+                html += `</ul></div>`;
+            }
             if (data.debug) {
                 html += `<details style="margin-top: 10px;"><summary style="cursor: pointer; color: var(--text-secondary);">Debug Info</summary><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 5px; font-size: 0.85rem;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
             }
