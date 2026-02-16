@@ -218,7 +218,7 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="sfClientId">Client ID (OAuth - optional)</label>
+                                <label for="sfClientId">Client ID (OAuth) <span style="color: var(--text-secondary); font-weight: normal;">*Required if SOAP API disabled</span></label>
                                 <input 
                                     type="text" 
                                     id="sfClientId" 
@@ -227,7 +227,7 @@
                                 >
                             </div>
                             <div class="form-group">
-                                <label for="sfClientSecret">Client Secret (OAuth - optional)</label>
+                                <label for="sfClientSecret">Client Secret (OAuth) <span style="color: var(--text-secondary); font-weight: normal;">*Required if SOAP API disabled</span></label>
                                 <input 
                                     type="password" 
                                     id="sfClientSecret" 
@@ -235,6 +235,17 @@
                                     placeholder="Connected App Client Secret"
                                 >
                             </div>
+                        </div>
+                        <div class="mfa-info" style="margin-top: 15px; margin-bottom: 15px;">
+                            <h4>🔐 OAuth Authentication (Required if SOAP API is disabled)</h4>
+                            <p>If your org has SOAP API login disabled, you <strong>must</strong> use OAuth with a Connected App:</p>
+                            <ol style="margin-left: 20px;">
+                                <li>Create a Connected App in Salesforce: Setup → App Manager → New Connected App</li>
+                                <li>Enable OAuth Settings and set Callback URL to: <code>https://login.salesforce.com</code></li>
+                                <li>Select OAuth Scopes (at minimum: "Access and manage your data (api)")</li>
+                                <li>Copy the Consumer Key (Client ID) and Consumer Secret</li>
+                                <li>Enter them in the fields above along with your username and password</li>
+                            </ol>
                         </div>
                         <div class="form-group">
                             <label for="sfDomain">Domain</label>

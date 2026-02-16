@@ -1701,17 +1701,71 @@ def salesforce_test_connection():
             if sf_config.get('client_secret'):
                 client_secret = str(sf_config.get('client_secret')).strip()
             
-            # If OAuth credentials provided, use OAuth flow
+            # If OAuth credentials provided, use OAuth 2.0 username-password flow
+            # This is required when SOAP API login is disabled
             if client_id and client_secret:
-                sf_kwargs = {
-                    'username': username,
-                    'password': password,
-                    'consumer_key': client_id,
-                    'consumer_secret': client_secret,
-                    'domain': domain
-                }
-                if security_token:
-                    sf_kwargs['security_token'] = security_token
+                logger.info("Using OAuth 2.0 username-password flow (SOAP API disabled)")
+                try:
+                    # Use OAuth 2.0 username-password flow
+                    # Build token endpoint URL
+                    login_domain = 'test' if domain == 'test' else 'login'
+                    token_url = f"https://{login_domain}.salesforce.com/services/oauth2/token"
+                    
+                    # Prepare token request data
+                    token_data = {
+                        'grant_type': 'password',
+                        'client_id': client_id,
+                        'client_secret': client_secret,
+                        'username': username,
+                        'password': password
+                    }
+                    
+                    # Add security token to password if provided
+                    if security_token:
+                        token_data['password'] = password + security_token
+                    
+                    # Request access token
+                    import requests
+                    token_response = requests.post(token_url, data=token_data)
+                    
+                    if token_response.status_code != 200:
+                        error_detail = token_response.text
+                        logger.error(f"OAuth token request failed: {error_detail}")
+                        return jsonify({
+                            'success': False,
+                            'error': 'OAuth authentication failed',
+                            'details': f'Token request failed: {error_detail}',
+                            'debug': {
+                                'status_code': token_response.status_code,
+                                'response': error_detail[:500]
+                            }
+                        }), 401
+                    
+                    token_json = token_response.json()
+                    access_token = token_json.get('access_token')
+                    instance_url = token_json.get('instance_url')
+                    
+                    if not access_token or not instance_url:
+                        return jsonify({
+                            'success': False,
+                            'error': 'OAuth token response missing required fields',
+                            'details': 'Did not receive access_token or instance_url from Salesforce'
+                        }), 401
+                    
+                    logger.info(f"OAuth authentication successful, instance: {instance_url}")
+                    
+                    # Create Salesforce client with session ID and instance URL
+                    sf = Salesforce(instance_url=instance_url, session_id=access_token)
+                    
+                except Exception as oauth_err:
+                    logger.error(f"OAuth flow error: {str(oauth_err)}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    return jsonify({
+                        'success': False,
+                        'error': f'OAuth authentication error: {str(oauth_err)}',
+                        'details': 'Failed to authenticate using OAuth 2.0. Please verify your Client ID, Client Secret, username, and password.'
+                    }), 401
             else:
                 # Standard username/password authentication
                 sf_kwargs = {
@@ -1753,26 +1807,26 @@ def salesforce_test_connection():
                 # The library should work with just username/password if IP is whitelisted
                 sf = Salesforce(**sf_kwargs)
                 
-                # Verify connection by checking if instance_url is set
-                instance_url = None
-                if hasattr(sf, 'sf_instance_url'):
-                    instance_url = sf.sf_instance_url
-                elif hasattr(sf, 'instance_url'):
-                    instance_url = sf.instance_url
-                elif hasattr(sf, 'base_url'):
-                    instance_url = sf.base_url
-                
-                if not instance_url:
-                    logger.warning("Salesforce client created but instance_url not found")
-                    # Try a test query to verify connection
-                    try:
-                        test_result = sf.query("SELECT Id FROM User LIMIT 1")
-                        logger.info("Connection verified via test query")
-                    except Exception as test_err:
-                        logger.error(f"Test query failed: {str(test_err)}")
-                        raise
+            # Verify connection by checking if instance_url is set
+            instance_url = None
+            if hasattr(sf, 'sf_instance_url'):
+                instance_url = sf.sf_instance_url
+            elif hasattr(sf, 'instance_url'):
+                instance_url = sf.instance_url
+            elif hasattr(sf, 'base_url'):
+                instance_url = sf.base_url
+            
+            if not instance_url:
+                logger.warning("Salesforce client created but instance_url not found")
+                # Try a test query to verify connection
+                try:
+                    test_result = sf.query("SELECT Id FROM User LIMIT 1")
+                    logger.info("Connection verified via test query")
+                except Exception as test_err:
+                    logger.error(f"Test query failed: {str(test_err)}")
+                    raise
                     
-            except Exception as init_err:
+                except Exception as init_err:
                 error_msg = str(init_err)
                 logger.error(f"Error creating Salesforce client: {error_msg}")
                 logger.error(f"Exception type: {type(init_err).__name__}")
