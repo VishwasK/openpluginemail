@@ -10,6 +10,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import logging
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -1725,7 +1726,7 @@ def salesforce_test_connection():
                         token_data['password'] = password + security_token
                     
                     # Request access token
-                    token_response = requests.post(token_url, data=token_data)
+                    token_response = requests.post(token_url, data=token_data, timeout=30)
                     
                     if token_response.status_code != 200:
                         error_detail = token_response.text
