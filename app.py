@@ -1725,7 +1725,6 @@ def salesforce_test_connection():
                         token_data['password'] = password + security_token
                     
                     # Request access token
-                    import requests
                     token_response = requests.post(token_url, data=token_data)
                     
                     if token_response.status_code != 200:
@@ -1767,7 +1766,8 @@ def salesforce_test_connection():
                         'details': 'Failed to authenticate using OAuth 2.0. Please verify your Client ID, Client Secret, username, and password.'
                     }), 401
             else:
-                # Standard username/password authentication
+                # Standard username/password authentication (SOAP)
+                logger.info(f"Using SOAP authentication")
                 sf_kwargs = {
                     'username': username,
                     'password': password,
@@ -1779,35 +1779,75 @@ def salesforce_test_connection():
                 # Add organizationId if provided (for IP-whitelisted orgs)
                 if organization_id:
                     sf_kwargs['organizationId'] = organization_id
+                
+                logger.info(f"Salesforce kwargs keys: {list(sf_kwargs.keys())}")
+                logger.info(f"Username length: {len(username)}, Password length: {len(password) if password else 0}")
+                
+                # Try to initialize Salesforce client
+                try:
+                    # Log the exact kwargs being passed (without password value)
+                    safe_kwargs = {k: ('***' if k == 'password' or k == 'consumer_secret' else v) for k, v in sf_kwargs.items()}
+                    logger.info(f"Calling Salesforce with kwargs: {safe_kwargs}")
+                    
+                    # Try to initialize Salesforce
+                    # The library should work with just username/password if IP is whitelisted
+                    sf = Salesforce(**sf_kwargs)
+                    error_msg = str(init_err)
+                    logger.error(f"Error creating Salesforce client: {error_msg}")
+                    logger.error(f"Exception type: {type(init_err).__name__}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    
+                    # Check if it's the specific error about login information
+                    if 'login information' in error_msg.lower() or 'instance and token' in error_msg.lower():
+                        # This error can occur even without IP restrictions
+                        # It might be a library issue or credential format issue
+                        logger.error(f"Salesforce initialization failed with 'login information' error")
+                        logger.error(f"Error details: {error_msg}")
+                        logger.error(f"Kwargs passed: {list(sf_kwargs.keys())}")
+                        
+                        # Provide helpful troubleshooting
+                        troubleshooting = []
+                        if not security_token:
+                            troubleshooting.append("Try adding a security token (even if IP is whitelisted, some orgs require it)")
+                        troubleshooting.append("Verify username is your full email address")
+                        troubleshooting.append("Verify password is correct (check for typos)")
+                        troubleshooting.append("Try using OAuth (Client ID/Secret) instead of username/password")
+                        troubleshooting.append("Check if your org requires MFA (Multi-Factor Authentication)")
+                        
+                        return jsonify({
+                            'success': False,
+                            'error': 'Salesforce authentication failed. The library could not authenticate with provided credentials.',
+                            'details': f'Error: {error_msg}. This can occur even without IP restrictions.',
+                            'troubleshooting': troubleshooting,
+                            'solution': 'Try: 1) Add a security token, 2) Verify credentials, 3) Use OAuth instead',
+                            'debug': {
+                                'username_provided': bool(username),
+                                'password_provided': bool(password),
+                                'security_token_provided': bool(security_token),
+                                'oauth_provided': bool(client_id and client_secret),
+                                'kwargs_keys': list(sf_kwargs.keys()),
+                                'error_type': 'authentication_failed',
+                                'raw_error': error_msg
+                            }
+                        }), 401
+                    
+                    return jsonify({
+                        'success': False,
+                        'error': f'Failed to initialize Salesforce client: {error_msg}',
+                        'debug': {
+                            'exception_type': type(init_err).__name__,
+                            'kwargs_keys': list(sf_kwargs.keys())
+                        }
+                    }), 400
             
-            logger.info(f"Attempting Salesforce connection with username: {username}, domain: {domain}, has_token: {bool(security_token)}, has_oauth: {bool(client_id and client_secret)}")
-            logger.info(f"Salesforce kwargs keys: {list(sf_kwargs.keys())}")
-            logger.info(f"Username length: {len(username)}, Password length: {len(password) if password else 0}")
-            
-            # Verify we have the minimum required parameters
-            if not username or not password:
+            # Verify connection by checking if instance_url is set
+            if sf is None:
                 return jsonify({
                     'success': False,
-                    'error': 'Username and password are required and cannot be empty',
-                    'debug': {
-                        'username': username[:10] + '...' if len(username) > 10 else username,
-                        'username_length': len(username),
-                        'password_length': len(password) if password else 0,
-                        'has_password': bool(password)
-                    }
-                }), 400
+                    'error': 'Failed to initialize Salesforce client'
+                }), 500
             
-            # Try to initialize Salesforce client
-            try:
-                # Log the exact kwargs being passed (without password value)
-                safe_kwargs = {k: ('***' if k == 'password' or k == 'consumer_secret' else v) for k, v in sf_kwargs.items()}
-                logger.info(f"Calling Salesforce with kwargs: {safe_kwargs}")
-                
-                # Try to initialize Salesforce
-                # The library should work with just username/password if IP is whitelisted
-                sf = Salesforce(**sf_kwargs)
-                
-            # Verify connection by checking if instance_url is set
             instance_url = None
             if hasattr(sf, 'sf_instance_url'):
                 instance_url = sf.sf_instance_url
@@ -1825,56 +1865,6 @@ def salesforce_test_connection():
                 except Exception as test_err:
                     logger.error(f"Test query failed: {str(test_err)}")
                     raise
-                    
-                except Exception as init_err:
-                error_msg = str(init_err)
-                logger.error(f"Error creating Salesforce client: {error_msg}")
-                logger.error(f"Exception type: {type(init_err).__name__}")
-                import traceback
-                logger.error(traceback.format_exc())
-                
-                # Check if it's the specific error about login information
-                if 'login information' in error_msg.lower() or 'instance and token' in error_msg.lower():
-                    # This error can occur even without IP restrictions
-                    # It might be a library issue or credential format issue
-                    logger.error(f"Salesforce initialization failed with 'login information' error")
-                    logger.error(f"Error details: {error_msg}")
-                    logger.error(f"Kwargs passed: {list(sf_kwargs.keys())}")
-                    
-                    # Provide helpful troubleshooting
-                    troubleshooting = []
-                    if not security_token:
-                        troubleshooting.append("Try adding a security token (even if IP is whitelisted, some orgs require it)")
-                    troubleshooting.append("Verify username is your full email address")
-                    troubleshooting.append("Verify password is correct (check for typos)")
-                    troubleshooting.append("Try using OAuth (Client ID/Secret) instead of username/password")
-                    troubleshooting.append("Check if your org requires MFA (Multi-Factor Authentication)")
-                    
-                    return jsonify({
-                        'success': False,
-                        'error': 'Salesforce authentication failed. The library could not authenticate with provided credentials.',
-                        'details': f'Error: {error_msg}. This can occur even without IP restrictions.',
-                        'troubleshooting': troubleshooting,
-                        'solution': 'Try: 1) Add a security token, 2) Verify credentials, 3) Use OAuth instead',
-                        'debug': {
-                            'username_provided': bool(username),
-                            'password_provided': bool(password),
-                            'security_token_provided': bool(security_token),
-                            'oauth_provided': bool(client_id and client_secret),
-                            'kwargs_keys': list(sf_kwargs.keys()),
-                            'error_type': 'authentication_failed',
-                            'raw_error': error_msg
-                        }
-                    }), 401
-                
-                return jsonify({
-                    'success': False,
-                    'error': f'Failed to initialize Salesforce client: {error_msg}',
-                    'debug': {
-                        'exception_type': type(init_err).__name__,
-                        'kwargs_keys': list(sf_kwargs.keys())
-                    }
-                }), 400
             
             # Test connection by making a simple query
             test_query = "SELECT Id FROM User LIMIT 1"
