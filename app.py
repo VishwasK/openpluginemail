@@ -1742,17 +1742,33 @@ def salesforce_test_connection():
                 
                 # Check if it's the specific error about login information
                 if 'login information' in error_msg.lower() or 'instance and token' in error_msg.lower():
-                    return jsonify({
-                        'success': False,
-                        'error': 'Salesforce authentication failed. Please verify your credentials.',
-                        'details': 'The library requires username, password, and optionally a security token. If your IP is not whitelisted, you need a security token.',
-                        'debug': {
-                            'username_provided': bool(username),
-                            'password_provided': bool(password),
-                            'security_token_provided': bool(security_token),
-                            'kwargs_keys': list(sf_kwargs.keys())
-                        }
-                    }), 401
+                    # This error typically means security token is required
+                    if not security_token:
+                        return jsonify({
+                            'success': False,
+                            'error': 'Security token required. Your IP address is not whitelisted in Salesforce.',
+                            'details': 'You need to provide a security token to authenticate. Get your security token from: Setup → My Personal Information → Reset My Security Token. The token will be emailed to you.',
+                            'solution': 'Add your security token in the "Security Token" field above and try again.',
+                            'debug': {
+                                'username_provided': bool(username),
+                                'password_provided': bool(password),
+                                'security_token_provided': False,
+                                'kwargs_keys': list(sf_kwargs.keys()),
+                                'error_type': 'missing_security_token'
+                            }
+                        }), 401
+                    else:
+                        return jsonify({
+                            'success': False,
+                            'error': 'Salesforce authentication failed. Please verify your credentials.',
+                            'details': 'Username, password, and security token were provided but authentication still failed. Please verify all credentials are correct.',
+                            'debug': {
+                                'username_provided': bool(username),
+                                'password_provided': bool(password),
+                                'security_token_provided': bool(security_token),
+                                'kwargs_keys': list(sf_kwargs.keys())
+                            }
+                        }), 401
                 
                 return jsonify({
                     'success': False,

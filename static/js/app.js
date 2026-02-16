@@ -751,6 +751,20 @@ async function testSalesforceConnection(creds = null, showSaveMessage = false) {
             if (data.details) {
                 html += `<small style="display: block; margin-top: 5px; color: var(--text-secondary);">${data.details}</small>`;
             }
+            if (data.solution) {
+                html += `<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">`;
+                html += `<strong>💡 Solution:</strong> ${data.solution}`;
+                html += `</div>`;
+            }
+            if (data.debug && data.debug.error_type === 'missing_security_token') {
+                html += `<div style="margin-top: 10px; padding: 10px; background: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">`;
+                html += `<strong>📝 Next Steps:</strong><br>`;
+                html += `1. Go to Salesforce Setup → My Personal Information → Reset My Security Token<br>`;
+                html += `2. Check your email for the security token<br>`;
+                html += `3. Enter the token in the "Security Token" field above<br>`;
+                html += `4. Click "Test Connection" again`;
+                html += `</div>`;
+            }
             if (data.debug) {
                 html += `<details style="margin-top: 10px;"><summary style="cursor: pointer; color: var(--text-secondary);">Debug Info</summary><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 5px; font-size: 0.85rem;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
             }

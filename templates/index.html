@@ -193,15 +193,15 @@
                             >
                         </div>
                         <div class="form-group">
-                            <label for="sfSecurityToken">Security Token (Optional)</label>
+                            <label for="sfSecurityToken">Security Token <span style="color: var(--text-secondary); font-weight: normal;">(Required if IP not whitelisted)</span></label>
                             <input 
                                 type="password" 
                                 id="sfSecurityToken" 
                                 name="sfSecurityToken" 
-                                placeholder="Security token (optional - only needed if IP not whitelisted)"
+                                placeholder="Security token - get from Salesforce Setup"
                             >
                             <small class="help-text">
-                                Only required if your IP address is not whitelisted in Salesforce. Get your security token from: Setup → My Personal Information → Reset My Security Token
+                                <strong>Required if your IP is not whitelisted.</strong> Get your security token from: Setup → My Personal Information → Reset My Security Token. The token will be emailed to you. If you get a "login information" error, you need to add this token.
                             </small>
                         </div>
                         <div class="form-row">
