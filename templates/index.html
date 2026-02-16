@@ -264,12 +264,15 @@
                                 <strong>Note:</strong> The callback URL is not actually used for username-password flow - it's just required by Salesforce. Use the standard Salesforce callback URLs listed above.
                             </p>
                             <div style="margin-top: 10px; padding: 10px; background: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">
-                                <strong>⚠️ Important:</strong> If you get "authentication failure" or "invalid_grant" error:
+                                <strong>⚠️ Important:</strong> If you get "authentication failure" or "invalid_grant" error, check:
                                 <ul style="margin: 5px 0 0 20px;">
-                                    <li>Verify your username and password are correct</li>
-                                    <li>If you have MFA enabled, you may need to append your security token to the password</li>
-                                    <li>Make sure "Enable OAuth Username-Password Flow" is checked in your Connected App settings</li>
-                                    <li>Ensure your Connected App has the required OAuth scopes</li>
+                                    <li>✓ Username and password are correct</li>
+                                    <li>✓ "Enable Authorization Code and Credentials Flow" is checked (NOT just Client Credentials)</li>
+                                    <li>✓ Connected App has OAuth scopes: "Access and manage your data (api)"</li>
+                                    <li>✓ <strong>Connected App "Permitted Users"</strong> is set to "All users may self-authorize" OR your user is in the permitted list</li>
+                                    <li>✓ Connected App status is "Active" (not Inactive)</li>
+                                    <li>✓ Correct domain selected (Production vs Sandbox)</li>
+                                    <li>✓ Client ID and Client Secret are correct (Consumer Key and Consumer Secret)</li>
                                 </ul>
                             </div>
                         </div>

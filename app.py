@@ -1729,8 +1729,15 @@ def salesforce_test_connection():
                     else:
                         logger.info("No security token provided - using password as-is (IP likely not restricted)")
                     
+                    # Log request details (without sensitive data)
+                    logger.info(f"OAuth token request to: {token_url}")
+                    logger.info(f"OAuth request params: grant_type=password, client_id={client_id[:10]}..., username={username}, has_password=True, has_security_token={bool(security_token and security_token.strip())}")
+                    
                     # Request access token
                     token_response = requests.post(token_url, data=token_data, timeout=30)
+                    
+                    # Log response status
+                    logger.info(f"OAuth token response status: {token_response.status_code}")
                     
                     if token_response.status_code != 200:
                         error_detail = token_response.text
@@ -1766,13 +1773,16 @@ def salesforce_test_connection():
                                     troubleshooting.append('<strong>CRITICAL:</strong> Make sure "Enable Authorization Code and Credentials Flow" is checked in your Connected App (NOT just "Client Credentials Flow")')
                                     troubleshooting.append('Verify your Connected App has the required OAuth scopes (at minimum: "Access and manage your data (api)")')
                                     troubleshooting.append('"Client Credentials Flow" alone does NOT support username-password authentication')
+                                    troubleshooting.append('<strong>Check Connected App "Permitted Users" setting:</strong> Make sure it\'s set to "All users may self-authorize" OR your user profile is added to permitted users')
+                                    troubleshooting.append('<strong>Verify Connected App is activated:</strong> Check that your Connected App status is "Active" in App Manager')
+                                    troubleshooting.append('<strong>Check domain:</strong> Make sure you selected the correct domain (Production vs Sandbox)')
                                 
                                 return jsonify({
                                     'success': False,
                                     'error': error_message,
                                     'details': details,
                                     'troubleshooting': troubleshooting,
-                                    'solution': 'Try: 1) Verify username/password, 2) Add security token if MFA enabled, 3) Check Connected App OAuth settings',
+                                    'solution': 'Check: 1) Connected App Permitted Users setting, 2) Connected App is Active, 3) Authorization Code flow enabled, 4) Correct domain selected',
                                     'debug': {
                                         'status_code': token_response.status_code,
                                         'error_type': error_type,
