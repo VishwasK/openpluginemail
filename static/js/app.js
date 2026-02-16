@@ -566,6 +566,405 @@ document.getElementById('openaiCredentialsForm').addEventListener('submit', (e) 
 
 document.getElementById('clearOpenAIBtn').addEventListener('click', clearOpenAICredentials);
 
+// Salesforce Credentials Management
+function loadSalesforceCredentials() {
+    try {
+        const saved = localStorage.getItem(SALESFORCE_KEY);
+        if (saved) {
+            const creds = JSON.parse(saved);
+            document.getElementById('sfUsername').value = creds.username || '';
+            document.getElementById('sfPassword').value = creds.password || '';
+            document.getElementById('sfSecurityToken').value = creds.security_token || '';
+            document.getElementById('sfClientId').value = creds.client_id || '';
+            document.getElementById('sfClientSecret').value = creds.client_secret || '';
+            document.getElementById('sfDomain').value = creds.domain || 'login';
+            document.getElementById('clearSalesforceBtn').style.display = 'inline-block';
+        }
+    } catch (error) {
+        console.error('Error loading Salesforce credentials:', error);
+    }
+}
+
+function saveSalesforceCredentials() {
+    const credentials = {
+        username: document.getElementById('sfUsername').value.trim(),
+        password: document.getElementById('sfPassword').value,
+        security_token: document.getElementById('sfSecurityToken').value || null,
+        client_id: document.getElementById('sfClientId').value.trim() || null,
+        client_secret: document.getElementById('sfClientSecret').value || null,
+        domain: document.getElementById('sfDomain').value || 'login'
+    };
+    
+    if (credentials.username && credentials.password) {
+        localStorage.setItem(SALESFORCE_KEY, JSON.stringify(credentials));
+        document.getElementById('clearSalesforceBtn').style.display = 'inline-block';
+        return credentials;
+    }
+    return null;
+}
+
+function getSalesforceCredentials() {
+    const saved = localStorage.getItem(SALESFORCE_KEY);
+    if (saved) {
+        return JSON.parse(saved);
+    }
+    
+    // Fallback to form values
+    return {
+        username: document.getElementById('sfUsername').value.trim(),
+        password: document.getElementById('sfPassword').value,
+        security_token: document.getElementById('sfSecurityToken').value || null,
+        client_id: document.getElementById('sfClientId').value.trim() || null,
+        client_secret: document.getElementById('sfClientSecret').value || null,
+        domain: document.getElementById('sfDomain').value || 'login'
+    };
+}
+
+function clearSalesforceCredentials() {
+    if (confirm('Are you sure you want to clear your saved Salesforce credentials?')) {
+        localStorage.removeItem(SALESFORCE_KEY);
+        document.getElementById('salesforceCredentialsForm').reset();
+        document.getElementById('clearSalesforceBtn').style.display = 'none';
+    }
+}
+
+// Handle Salesforce credentials form
+document.getElementById('salesforceCredentialsForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    saveSalesforceCredentials();
+    
+    const resultMessage = document.createElement('div');
+    resultMessage.className = 'result-message success';
+    resultMessage.textContent = '✓ Salesforce credentials saved locally in your browser';
+    resultMessage.style.marginTop = '15px';
+    
+    const form = document.getElementById('salesforceCredentialsForm');
+    const existingMessage = form.querySelector('.result-message');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+    form.appendChild(resultMessage);
+    
+    setTimeout(() => {
+        resultMessage.remove();
+    }, 3000);
+});
+
+document.getElementById('clearSalesforceBtn').addEventListener('click', clearSalesforceCredentials);
+
+// Salesforce Query
+document.getElementById('salesforceQueryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const queryBtn = document.getElementById('salesforceQueryBtn');
+    const btnText = queryBtn.querySelector('.btn-text');
+    const btnLoader = queryBtn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('salesforceQueryResult');
+    
+    const creds = getSalesforceCredentials();
+    if (!creds.username || !creds.password) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = '✗ Please configure your Salesforce credentials first';
+        return;
+    }
+    
+    queryBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/salesforce/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                soql: document.getElementById('soqlQuery').value,
+                sf_config: creds
+            })
+        });
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+        }
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            let html = `<h3>Query Results</h3>`;
+            html += `<p><strong>Total Records: ${data.total_size}</strong></p>`;
+            html += `<p><strong>SOQL:</strong> <code>${data.soql}</code></p>`;
+            
+            if (data.records && data.records.length > 0) {
+                html += `<div style="margin-top: 15px; overflow-x: auto;"><table style="width: 100%; border-collapse: collapse;">`;
+                // Get column headers from first record
+                const headers = Object.keys(data.records[0]);
+                html += `<thead><tr>`;
+                headers.forEach(h => {
+                    html += `<th style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-color); text-align: left;">${h}</th>`;
+                });
+                html += `</tr></thead><tbody>`;
+                
+                data.records.forEach(record => {
+                    html += `<tr>`;
+                    headers.forEach(h => {
+                        const value = record[h] || '';
+                        html += `<td style="padding: 8px; border: 1px solid var(--border-color);">${value}</td>`;
+                    });
+                    html += `</tr>`;
+                });
+                html += `</tbody></table></div>`;
+            } else {
+                html += `<p>No records found.</p>`;
+            }
+            
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to query Salesforce'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Network error: ${error.message}`;
+    } finally {
+        queryBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Salesforce Create Record
+document.getElementById('salesforceCreateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const createBtn = document.getElementById('salesforceCreateBtn');
+    const btnText = createBtn.querySelector('.btn-text');
+    const btnLoader = createBtn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('salesforceCreateResult');
+    
+    const creds = getSalesforceCredentials();
+    if (!creds.username || !creds.password) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = '✗ Please configure your Salesforce credentials first';
+        return;
+    }
+    
+    let fields;
+    try {
+        fields = JSON.parse(document.getElementById('createFields').value);
+    } catch (parseError) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Invalid JSON in fields: ${parseError.message}`;
+        return;
+    }
+    
+    createBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/salesforce/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                object_type: document.getElementById('createObjectType').value,
+                fields: fields,
+                sf_config: creds
+            })
+        });
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+        }
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            resultDiv.innerHTML = `<h3>✅ Record Created Successfully</h3><p><strong>Record ID:</strong> ${data.id}</p><p><strong>Object Type:</strong> ${data.object_type}</p><p>${data.message}</p>`;
+            document.getElementById('salesforceCreateForm').reset();
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to create record'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Network error: ${error.message}`;
+    } finally {
+        createBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Salesforce Update Record
+document.getElementById('salesforceUpdateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const updateBtn = document.getElementById('salesforceUpdateBtn');
+    const btnText = updateBtn.querySelector('.btn-text');
+    const btnLoader = updateBtn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('salesforceUpdateResult');
+    
+    const creds = getSalesforceCredentials();
+    if (!creds.username || !creds.password) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = '✗ Please configure your Salesforce credentials first';
+        return;
+    }
+    
+    let fields;
+    try {
+        fields = JSON.parse(document.getElementById('updateFields').value);
+    } catch (parseError) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Invalid JSON in fields: ${parseError.message}`;
+        return;
+    }
+    
+    updateBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/salesforce/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                object_type: document.getElementById('updateObjectType').value,
+                record_id: document.getElementById('updateRecordId').value,
+                fields: fields,
+                sf_config: creds
+            })
+        });
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+        }
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            resultDiv.innerHTML = `<h3>✅ Record Updated Successfully</h3><p><strong>Record ID:</strong> ${data.id}</p><p><strong>Object Type:</strong> ${data.object_type}</p><p>${data.message}</p>`;
+            document.getElementById('salesforceUpdateForm').reset();
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to update record'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Network error: ${error.message}`;
+    } finally {
+        updateBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Salesforce Execute Action
+document.getElementById('salesforceActionForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const actionBtn = document.getElementById('salesforceActionBtn');
+    const btnText = actionBtn.querySelector('.btn-text');
+    const btnLoader = actionBtn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('salesforceActionResult');
+    
+    const creds = getSalesforceCredentials();
+    if (!creds.username || !creds.password) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = '✗ Please configure your Salesforce credentials first';
+        return;
+    }
+    
+    let actionParams = {};
+    const paramsText = document.getElementById('actionParams').value.trim();
+    if (paramsText) {
+        try {
+            actionParams = JSON.parse(paramsText);
+        } catch (parseError) {
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Invalid JSON in action parameters: ${parseError.message}`;
+            return;
+        }
+    }
+    
+    actionBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/salesforce/execute-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action_name: document.getElementById('actionName').value,
+                action_params: actionParams,
+                record_id: document.getElementById('actionRecordId').value || null,
+                sf_config: creds
+            })
+        });
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+        }
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            let html = `<h3>✅ Action Executed Successfully</h3>`;
+            html += `<p><strong>Action:</strong> ${data.action_name}</p>`;
+            html += `<p>${data.message}</p>`;
+            if (data.note) {
+                html += `<p><em>${data.note}</em></p>`;
+            }
+            if (data.params && Object.keys(data.params).length > 0) {
+                html += `<h4>Parameters:</h4><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">${JSON.stringify(data.params, null, 2)}</pre>`;
+            }
+            resultDiv.innerHTML = html;
+            document.getElementById('salesforceActionForm').reset();
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `✗ Error: ${data.error || 'Failed to execute action'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `✗ Network error: ${error.message}`;
+    } finally {
+        actionBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
 // Web Search
 document.getElementById('webSearchForm').addEventListener('submit', async (e) => {
     e.preventDefault();
