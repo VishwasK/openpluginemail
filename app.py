@@ -1749,13 +1749,35 @@ def salesforce_test_connection():
                             
                             if 'invalid_client' in error_type.lower():
                                 error_message = 'Invalid Client ID or Client Secret'
-                                details = 'Please verify your Client ID and Client Secret are correct.'
+                                details = 'Please verify your Client ID and Client Secret are correct. Make sure you copied the Consumer Key (Client ID) and Consumer Secret from your Connected App.'
                             elif 'invalid_grant' in error_type.lower():
-                                error_message = 'Invalid credentials'
-                                details = 'Please verify your username and password are correct. If you have MFA enabled, you may need a security token appended to your password.'
+                                error_message = 'Authentication failed - Invalid credentials'
+                                details = 'Please verify your username and password are correct. '
+                                troubleshooting = []
+                                
+                                if 'authentication failure' in error_desc.lower():
+                                    details += 'This usually means: '
+                                    troubleshooting.append('Username or password is incorrect')
+                                    troubleshooting.append('If MFA is enabled, you may need to append your security token to the password')
+                                    troubleshooting.append('Make sure "Enable OAuth Username-Password Flow" is checked in your Connected App')
+                                    troubleshooting.append('Verify your Connected App has the required OAuth scopes (at minimum: "Access and manage your data (api)")')
+                                
+                                return jsonify({
+                                    'success': False,
+                                    'error': error_message,
+                                    'details': details,
+                                    'troubleshooting': troubleshooting,
+                                    'solution': 'Try: 1) Verify username/password, 2) Add security token if MFA enabled, 3) Check Connected App OAuth settings',
+                                    'debug': {
+                                        'status_code': token_response.status_code,
+                                        'error_type': error_type,
+                                        'error_description': error_desc,
+                                        'has_security_token': bool(security_token)
+                                    }
+                                }), 401
                             elif 'invalid_request' in error_type.lower():
                                 error_message = 'Invalid OAuth request'
-                                details = f'Error: {error_desc}. Make sure your Connected App is configured correctly with OAuth enabled.'
+                                details = f'Error: {error_desc}. Make sure your Connected App is configured correctly with OAuth enabled and "Enable OAuth Username-Password Flow" is checked.'
                         
                         return jsonify({
                             'success': False,

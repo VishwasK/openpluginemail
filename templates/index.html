@@ -257,6 +257,15 @@
                             <p style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
                                 <strong>Note:</strong> The callback URL is not actually used for username-password flow - it's just required by Salesforce. Use the standard Salesforce callback URLs listed above.
                             </p>
+                            <div style="margin-top: 10px; padding: 10px; background: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">
+                                <strong>⚠️ Important:</strong> If you get "authentication failure" or "invalid_grant" error:
+                                <ul style="margin: 5px 0 0 20px;">
+                                    <li>Verify your username and password are correct</li>
+                                    <li>If you have MFA enabled, you may need to append your security token to the password</li>
+                                    <li>Make sure "Enable OAuth Username-Password Flow" is checked in your Connected App settings</li>
+                                    <li>Ensure your Connected App has the required OAuth scopes</li>
+                                </ul>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="sfDomain">Domain</label>
