@@ -5,6 +5,8 @@ Main application file for the email plugin service
 
 import os
 import secrets
+import hashlib
+import base64
 from urllib.parse import urlencode
 from flask import Flask, request, jsonify, render_template, redirect, session
 from flask_cors import CORS
@@ -1422,10 +1424,17 @@ def salesforce_authorize():
         if not client_id or not client_secret:
             return jsonify({'success': False, 'error': 'Client ID and Client Secret are required'}), 400
 
-        # Store credentials in server session for use during callback
+        # Generate PKCE code_verifier and code_challenge
+        code_verifier = secrets.token_urlsafe(64)
+        code_challenge = base64.urlsafe_b64encode(
+            hashlib.sha256(code_verifier.encode('ascii')).digest()
+        ).rstrip(b'=').decode('ascii')
+
+        # Store credentials and PKCE verifier in server session for use during callback
         session['sf_client_id'] = client_id
         session['sf_client_secret'] = client_secret
         session['sf_domain'] = domain
+        session['sf_code_verifier'] = code_verifier
 
         login_base = 'test' if domain == 'test' else 'login'
         authorize_url = f"https://{login_base}.salesforce.com/services/oauth2/authorize"
@@ -1436,11 +1445,13 @@ def salesforce_authorize():
             'response_type': 'code',
             'client_id': client_id,
             'redirect_uri': callback_url,
-            'scope': 'api refresh_token'
+            'scope': 'api refresh_token',
+            'code_challenge': code_challenge,
+            'code_challenge_method': 'S256'
         }
 
         full_url = f"{authorize_url}?{urlencode(params)}"
-        logger.info(f"OAuth authorize URL built with redirect_uri={callback_url}")
+        logger.info(f"OAuth authorize URL built with PKCE and redirect_uri={callback_url}")
         return jsonify({'success': True, 'authorize_url': full_url}), 200
 
     except Exception as e:
@@ -1467,10 +1478,11 @@ def salesforce_callback():
                                    success=False,
                                    error='No authorization code received from Salesforce.')
 
-        # Retrieve client_id and client_secret from the request or session
+        # Retrieve credentials and PKCE verifier from session
         client_id = session.get('sf_client_id', '')
-        client_secret = request.args.get('client_secret', '') or session.get('sf_client_secret', '')
+        client_secret = session.get('sf_client_secret', '')
         domain = session.get('sf_domain', 'login')
+        code_verifier = session.get('sf_code_verifier', '')
 
         if not client_id:
             return render_template('callback.html',
@@ -1487,7 +1499,8 @@ def salesforce_callback():
             'code': code,
             'client_id': client_id,
             'client_secret': client_secret,
-            'redirect_uri': callback_url
+            'redirect_uri': callback_url,
+            'code_verifier': code_verifier
         }
 
         logger.info(f"Exchanging auth code for token at {token_url}")
@@ -1522,6 +1535,7 @@ def salesforce_callback():
         session.pop('sf_client_id', None)
         session.pop('sf_client_secret', None)
         session.pop('sf_domain', None)
+        session.pop('sf_code_verifier', None)
 
         return render_template('callback.html',
                                success=True,
