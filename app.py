@@ -1721,9 +1721,13 @@ def salesforce_test_connection():
                         'password': password
                     }
                     
-                    # Add security token to password if provided
-                    if security_token:
+                    # Add security token to password ONLY if explicitly provided and not empty
+                    # For OAuth, security token is typically NOT needed if IP is not restricted
+                    if security_token and security_token.strip():
+                        logger.info("Appending security token to password for OAuth")
                         token_data['password'] = password + security_token
+                    else:
+                        logger.info("No security token provided - using password as-is (IP likely not restricted)")
                     
                     # Request access token
                     token_response = requests.post(token_url, data=token_data, timeout=30)
