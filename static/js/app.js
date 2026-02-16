@@ -57,6 +57,7 @@ function clearCredentials() {
 // Update credentials status indicator
 function updateCredentialsStatus(saved) {
     const statusEl = document.getElementById('credentialsStatus');
+    if (!statusEl) return;
     if (saved) {
         statusEl.textContent = '(Saved)';
         statusEl.className = 'credentials-status saved';
@@ -93,15 +94,15 @@ async function checkHealth() {
         const data = await response.json();
         
         if (data.status === 'healthy') {
-            statusIndicator.className = 'status-indicator healthy';
-            statusText.textContent = `✓ ${data.service} - ${data.version}`;
+            statusIndicator.className = 'status-dot healthy';
+            statusText.textContent = `${data.service} v${data.version}`;
         } else {
-            statusIndicator.className = 'status-indicator error';
-            statusText.textContent = 'Service unhealthy';
+            statusIndicator.className = 'status-dot error';
+            statusText.textContent = 'Unhealthy';
         }
     } catch (error) {
-        statusIndicator.className = 'status-indicator error';
-        statusText.textContent = 'Unable to connect to service';
+        statusIndicator.className = 'status-dot error';
+        statusText.textContent = 'Disconnected';
         console.error('Health check failed:', error);
     }
 }
@@ -116,7 +117,7 @@ async function loadPluginInfo() {
         
         pluginInfoDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
     } catch (error) {
-        pluginInfoDiv.innerHTML = `<p style="color: var(--error-color);">Error loading plugin information: ${error.message}</p>`;
+        pluginInfoDiv.innerHTML = `<p style="color: var(--error);">Error loading plugin information: ${error.message}</p>`;
         console.error('Failed to load plugin info:', error);
     }
 }
@@ -308,43 +309,8 @@ function clearOpenAICredentials() {
     }
 }
 
-// Tab switching
-function initTabs() {
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetTab = btn.getAttribute('data-tab');
-            
-            if (!targetTab) {
-                console.error('Tab button missing data-tab attribute');
-                return;
-            }
-            
-            const targetElement = document.getElementById(targetTab);
-            if (!targetElement) {
-                console.error(`Tab content element not found: ${targetTab}`);
-                return;
-            }
-            
-            // Remove active class from all tabs
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => {
-                c.classList.remove('active');
-                c.style.display = 'none';
-            });
-            
-            // Add active class to clicked tab
-            btn.classList.add('active');
-            targetElement.classList.add('active');
-            targetElement.style.display = 'block';
-        });
-    });
-    
-    // Log for debugging
-    console.log(`Initialized ${tabBtns.length} tabs:`, Array.from(tabBtns).map(b => b.getAttribute('data-tab')));
-}
+// Tab switching (no-op; page and story tabs are handled in index.html inline script)
+function initTabs() {}
 
 // Story Writing
 document.getElementById('storyForm').addEventListener('submit', async (e) => {
@@ -750,7 +716,7 @@ document.getElementById('salesforceQueryForm').addEventListener('submit', async 
                 const headers = Object.keys(data.records[0]);
                 html += `<thead><tr>`;
                 headers.forEach(h => {
-                    html += `<th style="padding: 10px; border: 1px solid var(--border-color); background: var(--bg-color); text-align: left;">${h}</th>`;
+                    html += `<th style="padding: 10px; border: 1px solid var(--border); background: var(--bg-input); text-align: left;">${h}</th>`;
                 });
                 html += `</tr></thead><tbody>`;
                 
@@ -758,7 +724,7 @@ document.getElementById('salesforceQueryForm').addEventListener('submit', async 
                     html += `<tr>`;
                     headers.forEach(h => {
                         const value = record[h] || '';
-                        html += `<td style="padding: 8px; border: 1px solid var(--border-color);">${value}</td>`;
+                        html += `<td style="padding: 8px; border: 1px solid var(--border);">${value}</td>`;
                     });
                     html += `</tr>`;
                 });
@@ -991,7 +957,7 @@ document.getElementById('salesforceActionForm').addEventListener('submit', async
                 html += `<p><em>${data.note}</em></p>`;
             }
             if (data.params && Object.keys(data.params).length > 0) {
-                html += `<h4>Parameters:</h4><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">${JSON.stringify(data.params, null, 2)}</pre>`;
+                html += `<h4>Parameters:</h4><pre style="background: var(--bg-input); padding: 10px; border-radius: 4px;">${JSON.stringify(data.params, null, 2)}</pre>`;
             }
             resultDiv.innerHTML = html;
             document.getElementById('salesforceActionForm').reset();
@@ -1046,7 +1012,7 @@ document.getElementById('webSearchForm').addEventListener('submit', async (e) =>
                 html += `<p>No results were returned. This could be due to:</p>`;
                 html += `<ul><li>DuckDuckGo rate limiting</li><li>Network issues</li><li>Query too specific</li></ul>`;
                 if (data.debug) {
-                    html += `<details style="margin-top: 10px;"><summary>Debug Info</summary><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
+                    html += `<details style="margin-top: 10px;"><summary>Debug Info</summary><pre style="background: var(--bg-input); padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
                 }
                 html += `<p><strong>Try:</strong> A different search query or check Heroku logs for more details.</p>`;
                 resultDiv.innerHTML = html;
@@ -1056,9 +1022,9 @@ document.getElementById('webSearchForm').addEventListener('submit', async (e) =>
                 html += `<p><strong>Found ${data.count} results:</strong></p>`;
                 
                 data.results.forEach((result, index) => {
-                    html += `<div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid var(--primary-color);">`;
+                    html += `<div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 6px; border-left: 4px solid var(--primary);">`;
                     html += `<h4 style="margin-top: 0;">${index + 1}. ${result.title}</h4>`;
-                    html += `<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 5px 0;"><a href="${result.url}" target="_blank" style="color: var(--primary-color);">${result.url}</a></p>`;
+                    html += `<p style="color: var(--text-dim); font-size: 0.9rem; margin: 5px 0;"><a href="${result.url}" target="_blank" style="color: var(--primary);">${result.url}</a></p>`;
                     html += `<p style="margin: 10px 0;">${result.snippet}</p>`;
                     html += `</div>`;
                 });
@@ -1069,7 +1035,7 @@ document.getElementById('webSearchForm').addEventListener('submit', async (e) =>
             resultDiv.className = 'story-result error';
             let errorHtml = `✗ Error: ${data.error || 'Failed to search'}`;
             if (data.debug) {
-                errorHtml += `<details style="margin-top: 10px;"><summary>Debug Info</summary><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
+                errorHtml += `<details style="margin-top: 10px;"><summary>Debug Info</summary><pre style="background: var(--bg-input); padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
             }
             resultDiv.innerHTML = errorHtml;
         }
@@ -1129,8 +1095,8 @@ document.getElementById('searchSummarizeForm').addEventListener('submit', async 
             html += `<h4 style="margin-top: 20px;">Sources (${data.sources_count}):</h4>`;
             html += `<ul style="list-style: none; padding: 0;">`;
             data.search_results.forEach((result, index) => {
-                html += `<li style="margin-bottom: 10px; padding: 10px; background: white; border-radius: 4px;">`;
-                html += `<strong>${index + 1}.</strong> <a href="${result.url}" target="_blank" style="color: var(--primary-color);">${result.title}</a>`;
+                html += `<li style="margin-bottom: 10px; padding: 10px; background: var(--bg-input); border-radius: 4px;">`;
+                html += `<strong>${index + 1}.</strong> <a href="${result.url}" target="_blank" style="color: var(--primary);">${result.title}</a>`;
                 html += `</li>`;
             });
             html += `</ul>`;
