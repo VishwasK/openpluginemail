@@ -261,7 +261,7 @@
                                 <li>Enter them in the fields above along with your username and password</li>
                             </ol>
                             <p style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-                                <strong>Note:</strong> The callback URL is not actually used for username-password flow - it's just required by Salesforce. Use the standard Salesforce callback URLs listed above.
+                                <strong>⚠️ IMPORTANT - Callback URL MUST match:</strong> The callback URL in your Connected App <strong>must be exactly</strong> <code>https://login.salesforce.com/services/oauth2/success</code> (for Production) or <code>https://test.salesforce.com/services/oauth2/success</code> (for Sandbox). Our code sends this URL with every token request, and Salesforce will reject the request if it doesn't match what's configured in your Connected App. Do NOT use your Heroku app URL as the callback.
                             </p>
                             <div style="margin-top: 10px; padding: 10px; background: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">
                                 <strong>⚠️ Important:</strong> If you get "authentication failure" or "invalid_grant" error, check:

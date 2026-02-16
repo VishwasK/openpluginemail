@@ -1713,12 +1713,16 @@ def salesforce_test_connection():
                     token_url = f"https://{login_domain}.salesforce.com/services/oauth2/token"
                     
                     # Prepare token request data
+                    # Include redirect_uri - some Connected Apps require it
+                    callback_url = f"https://{login_domain}.salesforce.com/services/oauth2/success"
+                    
                     token_data = {
                         'grant_type': 'password',
                         'client_id': client_id,
                         'client_secret': client_secret,
                         'username': username,
-                        'password': password
+                        'password': password,
+                        'redirect_uri': callback_url
                     }
                     
                     # Add security token to password ONLY if explicitly provided and not empty
@@ -1731,7 +1735,8 @@ def salesforce_test_connection():
                     
                     # Log request details (without sensitive data)
                     logger.info(f"OAuth token request to: {token_url}")
-                    logger.info(f"OAuth request params: grant_type=password, client_id={client_id[:10]}..., username={username}, has_password=True, has_security_token={bool(security_token and security_token.strip())}")
+                    logger.info(f"OAuth redirect_uri: {callback_url}")
+                    logger.info(f"OAuth request params: grant_type=password, client_id={client_id[:10]}..., username={username}, has_password=True, has_security_token={bool(security_token and security_token.strip())}, redirect_uri={callback_url}")
                     
                     # Request access token
                     token_response = requests.post(token_url, data=token_data, timeout=30)
