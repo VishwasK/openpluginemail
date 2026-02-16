@@ -629,25 +629,98 @@ function clearSalesforceCredentials() {
 }
 
 // Handle Salesforce credentials form
-document.getElementById('salesforceCredentialsForm').addEventListener('submit', (e) => {
+document.getElementById('salesforceCredentialsForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    saveSalesforceCredentials();
+    const creds = saveSalesforceCredentials();
     
-    const resultMessage = document.createElement('div');
-    resultMessage.className = 'result-message success';
-    resultMessage.textContent = '✓ Salesforce credentials saved locally in your browser';
-    resultMessage.style.marginTop = '15px';
-    
-    const form = document.getElementById('salesforceCredentialsForm');
-    const existingMessage = form.querySelector('.result-message');
-    if (existingMessage) {
-        existingMessage.remove();
+    if (!creds) {
+        const statusDiv = document.getElementById('salesforceConnectionStatus');
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'result-message error';
+        statusDiv.innerHTML = '✗ Please fill in username and password';
+        return;
     }
-    form.appendChild(resultMessage);
     
-    setTimeout(() => {
-        resultMessage.remove();
-    }, 3000);
+    // Test connection when saving
+    await testSalesforceConnection(creds, true);
+});
+
+// Test Salesforce Connection
+async function testSalesforceConnection(creds = null, showSaveMessage = false) {
+    const testBtn = document.getElementById('testSalesforceBtn');
+    const statusDiv = document.getElementById('salesforceConnectionStatus');
+    
+    if (!creds) {
+        creds = getSalesforceCredentials();
+    }
+    
+    if (!creds.username || !creds.password) {
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'result-message error';
+        statusDiv.innerHTML = '✗ Please enter username and password first';
+        return;
+    }
+    
+    testBtn.disabled = true;
+    testBtn.textContent = 'Testing...';
+    statusDiv.style.display = 'block';
+    statusDiv.className = 'result-message';
+    statusDiv.innerHTML = '🔄 Testing connection...';
+    
+    try {
+        const response = await fetch('/api/salesforce/test-connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sf_config: creds
+            })
+        });
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            statusDiv.className = 'result-message success';
+            let html = `✅ <strong>Connection Successful!</strong><br>`;
+            html += `Connected as: ${data.username || creds.username}<br>`;
+            if (data.instance_url) {
+                html += `Instance: ${data.instance_url}<br>`;
+            }
+            if (showSaveMessage) {
+                html += `<br>✓ Credentials saved locally in your browser`;
+            }
+            statusDiv.innerHTML = html;
+            
+            // Save credentials if connection successful
+            if (showSaveMessage) {
+                localStorage.setItem(SALESFORCE_KEY, JSON.stringify(creds));
+                document.getElementById('clearSalesforceBtn').style.display = 'inline-block';
+            }
+        } else {
+            statusDiv.className = 'result-message error';
+            let html = `✗ <strong>Connection Failed</strong><br>`;
+            html += `${data.error || 'Unknown error'}<br>`;
+            if (data.details) {
+                html += `<small style="display: block; margin-top: 5px; color: var(--text-secondary);">${data.details}</small>`;
+            }
+            statusDiv.innerHTML = html;
+        }
+    } catch (error) {
+        statusDiv.className = 'result-message error';
+        statusDiv.innerHTML = `✗ <strong>Connection Error</strong><br>${error.message}`;
+    } finally {
+        testBtn.disabled = false;
+        testBtn.textContent = 'Test Connection';
+    }
+}
+
+document.getElementById('testSalesforceBtn').addEventListener('click', () => {
+    testSalesforceConnection();
 });
 
 document.getElementById('clearSalesforceBtn').addEventListener('click', clearSalesforceCredentials);

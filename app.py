@@ -973,15 +973,24 @@ class SalesforcePlugin:
                 }
             
             # Initialize Salesforce client with user-provided credentials
+            # Security token is optional - only include if provided
             try:
-                sf = Salesforce(
-                    username=sf_config.get('username'),
-                    password=sf_config.get('password'),
-                    security_token=sf_config.get('security_token'),
-                    consumer_key=sf_config.get('client_id'),
-                    consumer_secret=sf_config.get('client_secret'),
-                    domain=sf_config.get('domain', 'login')
-                )
+                sf_kwargs = {
+                    'username': sf_config.get('username'),
+                    'password': sf_config.get('password'),
+                    'domain': sf_config.get('domain', 'login')
+                }
+                
+                # Only add security_token if provided and not empty
+                if sf_config.get('security_token'):
+                    sf_kwargs['security_token'] = sf_config.get('security_token')
+                
+                # Only add OAuth credentials if provided
+                if sf_config.get('client_id') and sf_config.get('client_secret'):
+                    sf_kwargs['consumer_key'] = sf_config.get('client_id')
+                    sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
+                
+                sf = Salesforce(**sf_kwargs)
             except Exception as conn_error:
                 logger.error(f"Salesforce connection error: {str(conn_error)}")
                 return {
@@ -1047,15 +1056,24 @@ class SalesforcePlugin:
                 }
             
             # Initialize Salesforce client
+            # Security token is optional - only include if provided
             try:
-                sf = Salesforce(
-                    username=sf_config.get('username'),
-                    password=sf_config.get('password'),
-                    security_token=sf_config.get('security_token'),
-                    consumer_key=sf_config.get('client_id'),
-                    consumer_secret=sf_config.get('client_secret'),
-                    domain=sf_config.get('domain', 'login')
-                )
+                sf_kwargs = {
+                    'username': sf_config.get('username'),
+                    'password': sf_config.get('password'),
+                    'domain': sf_config.get('domain', 'login')
+                }
+                
+                # Only add security_token if provided and not empty
+                if sf_config.get('security_token'):
+                    sf_kwargs['security_token'] = sf_config.get('security_token')
+                
+                # Only add OAuth credentials if provided
+                if sf_config.get('client_id') and sf_config.get('client_secret'):
+                    sf_kwargs['consumer_key'] = sf_config.get('client_id')
+                    sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
+                
+                sf = Salesforce(**sf_kwargs)
             except Exception as conn_error:
                 logger.error(f"Salesforce connection error: {str(conn_error)}")
                 return {
@@ -1122,15 +1140,24 @@ class SalesforcePlugin:
                 }
             
             # Initialize Salesforce client
+            # Security token is optional - only include if provided
             try:
-                sf = Salesforce(
-                    username=sf_config.get('username'),
-                    password=sf_config.get('password'),
-                    security_token=sf_config.get('security_token'),
-                    consumer_key=sf_config.get('client_id'),
-                    consumer_secret=sf_config.get('client_secret'),
-                    domain=sf_config.get('domain', 'login')
-                )
+                sf_kwargs = {
+                    'username': sf_config.get('username'),
+                    'password': sf_config.get('password'),
+                    'domain': sf_config.get('domain', 'login')
+                }
+                
+                # Only add security_token if provided and not empty
+                if sf_config.get('security_token'):
+                    sf_kwargs['security_token'] = sf_config.get('security_token')
+                
+                # Only add OAuth credentials if provided
+                if sf_config.get('client_id') and sf_config.get('client_secret'):
+                    sf_kwargs['consumer_key'] = sf_config.get('client_id')
+                    sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
+                
+                sf = Salesforce(**sf_kwargs)
             except Exception as conn_error:
                 logger.error(f"Salesforce connection error: {str(conn_error)}")
                 return {
@@ -1192,15 +1219,24 @@ class SalesforcePlugin:
                 }
             
             # Initialize Salesforce client
+            # Security token is optional - only include if provided
             try:
-                sf = Salesforce(
-                    username=sf_config.get('username'),
-                    password=sf_config.get('password'),
-                    security_token=sf_config.get('security_token'),
-                    consumer_key=sf_config.get('client_id'),
-                    consumer_secret=sf_config.get('client_secret'),
-                    domain=sf_config.get('domain', 'login')
-                )
+                sf_kwargs = {
+                    'username': sf_config.get('username'),
+                    'password': sf_config.get('password'),
+                    'domain': sf_config.get('domain', 'login')
+                }
+                
+                # Only add security_token if provided and not empty
+                if sf_config.get('security_token'):
+                    sf_kwargs['security_token'] = sf_config.get('security_token')
+                
+                # Only add OAuth credentials if provided
+                if sf_config.get('client_id') and sf_config.get('client_secret'):
+                    sf_kwargs['consumer_key'] = sf_config.get('client_id')
+                    sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
+                
+                sf = Salesforce(**sf_kwargs)
             except Exception as conn_error:
                 logger.error(f"Salesforce connection error: {str(conn_error)}")
                 return {
@@ -1591,6 +1627,101 @@ def web_search_summarize():
 def salesforce_plugin_info():
     """Get Salesforce plugin information"""
     return jsonify(salesforce_plugin.get_plugin_info())
+
+
+@app.route('/api/salesforce/test-connection', methods=['POST'])
+def salesforce_test_connection():
+    """Test Salesforce connection endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Extract Salesforce config from request
+        sf_config = data.get('sf_config')
+        if not sf_config:
+            return jsonify({
+                'success': False,
+                'error': 'Salesforce credentials not provided'
+            }), 400
+        
+        # Validate required Salesforce fields
+        if not sf_config.get('username') or not sf_config.get('password'):
+            return jsonify({
+                'success': False,
+                'error': 'Username and password are required'
+            }), 400
+        
+        # Test connection by attempting to authenticate
+        try:
+            if not SALESFORCE_AVAILABLE:
+                return jsonify({
+                    'success': False,
+                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
+                }), 500
+            
+            # Initialize Salesforce client with user-provided credentials
+            # Security token is optional - only include if provided
+            sf_kwargs = {
+                'username': sf_config.get('username'),
+                'password': sf_config.get('password'),
+                'domain': sf_config.get('domain', 'login')
+            }
+            
+            # Only add security_token if provided and not empty
+            if sf_config.get('security_token'):
+                sf_kwargs['security_token'] = sf_config.get('security_token')
+            
+            # Only add OAuth credentials if provided
+            if sf_config.get('client_id') and sf_config.get('client_secret'):
+                sf_kwargs['consumer_key'] = sf_config.get('client_id')
+                sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
+            
+            sf = Salesforce(**sf_kwargs)
+            
+            # Test connection by making a simple query
+            test_query = "SELECT Id FROM User LIMIT 1"
+            result = sf.query(test_query)
+            
+            logger.info(f"Salesforce connection test successful for user: {sf_config.get('username')}")
+            return jsonify({
+                'success': True,
+                'message': 'Connection successful!',
+                'username': sf_config.get('username'),
+                'instance_url': sf.sf_instance_url if hasattr(sf, 'sf_instance_url') else 'Connected',
+                'test_query_result': {
+                    'total_size': result.get('totalSize', 0),
+                    'done': result.get('done', True)
+                }
+            }), 200
+            
+        except Exception as conn_error:
+            error_msg = str(conn_error)
+            logger.error(f"Salesforce connection test failed: {error_msg}")
+            
+            # Provide helpful error messages
+            if 'INVALID_LOGIN' in error_msg or 'authentication failure' in error_msg.lower():
+                return jsonify({
+                    'success': False,
+                    'error': 'Authentication failed. Please check your username and password.',
+                    'details': 'If you have MFA enabled, you may need a security token or OAuth credentials.'
+                }), 401
+            elif 'security token' in error_msg.lower():
+                return jsonify({
+                    'success': False,
+                    'error': 'Security token may be required. If your IP is not whitelisted, you need a security token.',
+                    'details': 'Get your security token from: Setup → My Personal Information → Reset My Security Token'
+                }), 401
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'Connection failed: {error_msg}'
+                }), 401
+    
+    except Exception as e:
+        logger.error(f"Error in salesforce_test_connection endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @app.route('/api/salesforce/query', methods=['POST'])

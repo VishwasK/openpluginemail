@@ -160,6 +160,17 @@
                 </div>
                 
                 <div id="salesforce-tab" class="tab-content" style="display: none;">
+                    <div class="mfa-info" style="margin-bottom: 20px;">
+                        <h3>🔒 Security Information</h3>
+                        <p><strong>How your credentials are protected:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            <li><strong>HTTPS Encryption:</strong> All data is encrypted in transit using HTTPS/TLS. Your credentials cannot be intercepted during transmission.</li>
+                            <li><strong>Local Storage:</strong> Credentials are stored only in your browser's localStorage. They are never stored on our servers.</li>
+                            <li><strong>No Server Storage:</strong> Credentials are sent with each request but never saved on the server.</li>
+                            <li><strong>Browser Security:</strong> localStorage is only accessible to JavaScript from the same domain (same-origin policy).</li>
+                        </ul>
+                        <p style="margin-top: 10px;"><strong>Note:</strong> If you're on a shared computer, clear your browser data when done. Consider using OAuth (Client ID/Secret) for better security.</p>
+                    </div>
                     <form id="salesforceCredentialsForm">
                         <div class="form-group">
                             <label for="sfUsername">Salesforce Username *</label>
@@ -182,15 +193,15 @@
                             >
                         </div>
                         <div class="form-group">
-                            <label for="sfSecurityToken">Security Token</label>
+                            <label for="sfSecurityToken">Security Token (Optional)</label>
                             <input 
                                 type="password" 
                                 id="sfSecurityToken" 
                                 name="sfSecurityToken" 
-                                placeholder="Security token (optional)"
+                                placeholder="Security token (optional - only needed if IP not whitelisted)"
                             >
                             <small class="help-text">
-                                Get your security token from: Setup → My Personal Information → Reset My Security Token
+                                Only required if your IP address is not whitelisted in Salesforce. Get your security token from: Setup → My Personal Information → Reset My Security Token
                             </small>
                         </div>
                         <div class="form-row">
@@ -225,10 +236,14 @@
                             <button type="submit" class="btn btn-primary">
                                 Save Salesforce Credentials
                             </button>
+                            <button type="button" class="btn btn-secondary" id="testSalesforceBtn">
+                                Test Connection
+                            </button>
                             <button type="button" class="btn btn-secondary" id="clearSalesforceBtn" style="display: none;">
                                 Clear Saved Credentials
                             </button>
                         </div>
+                        <div id="salesforceConnectionStatus" style="margin-top: 15px; display: none;"></div>
                     </form>
                 </div>
             </div>
