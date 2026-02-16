@@ -694,6 +694,15 @@ async function testSalesforceConnection(creds = null, showSaveMessage = false) {
     statusDiv.className = 'result-message';
     statusDiv.innerHTML = '🔄 Testing connection...';
     
+    // Log what we're sending (without password)
+    console.log('Testing Salesforce connection with:', {
+        username: creds.username,
+        has_password: !!creds.password,
+        has_security_token: !!creds.security_token,
+        domain: creds.domain,
+        keys: Object.keys(creds)
+    });
+    
     try {
         const response = await fetch('/api/salesforce/test-connection', {
             method: 'POST',
@@ -710,6 +719,13 @@ async function testSalesforceConnection(creds = null, showSaveMessage = false) {
         }
         
         const data = await response.json();
+        
+        // Log response for debugging
+        console.log('Salesforce connection test response:', {
+            success: data.success,
+            error: data.error,
+            debug: data.debug
+        });
         
         if (data.success) {
             statusDiv.className = 'result-message success';
@@ -734,6 +750,9 @@ async function testSalesforceConnection(creds = null, showSaveMessage = false) {
             html += `${data.error || 'Unknown error'}<br>`;
             if (data.details) {
                 html += `<small style="display: block; margin-top: 5px; color: var(--text-secondary);">${data.details}</small>`;
+            }
+            if (data.debug) {
+                html += `<details style="margin-top: 10px;"><summary style="cursor: pointer; color: var(--text-secondary);">Debug Info</summary><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 5px; font-size: 0.85rem;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
             }
             statusDiv.innerHTML = html;
         }

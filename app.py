@@ -1643,11 +1643,24 @@ def salesforce_test_connection():
                 'error': 'Salesforce credentials not provided'
             }), 400
         
+        # Log the received config for debugging (without password)
+        logger.info(f"Received Salesforce config keys: {list(sf_config.keys())}")
+        logger.info(f"Username present: {bool(sf_config.get('username'))}, Password present: {bool(sf_config.get('password'))}")
+        
         # Validate required Salesforce fields
-        if not sf_config.get('username') or not sf_config.get('password'):
+        username = sf_config.get('username', '').strip() if sf_config.get('username') else ''
+        password = sf_config.get('password', '').strip() if sf_config.get('password') else ''
+        
+        if not username or not password:
+            logger.error(f"Missing credentials - username: '{username[:10] if username else 'EMPTY'}...', password: {'PRESENT' if password else 'EMPTY'}")
             return jsonify({
                 'success': False,
-                'error': 'Username and password are required'
+                'error': 'Username and password are required',
+                'debug': {
+                    'username_provided': bool(username),
+                    'password_provided': bool(password),
+                    'config_keys': list(sf_config.keys())
+                }
             }), 400
         
         # Test connection by attempting to authenticate
@@ -1660,15 +1673,11 @@ def salesforce_test_connection():
             
             # Initialize Salesforce client with user-provided credentials
             # Security token is optional - only include if provided
-            username = sf_config.get('username', '').strip()
-            password = sf_config.get('password', '').strip()
-            domain = sf_config.get('domain', 'login').strip() or 'login'
-            
-            if not username or not password:
-                return jsonify({
-                    'success': False,
-                    'error': 'Username and password cannot be empty'
-                }), 400
+            domain = sf_config.get('domain', 'login')
+            if isinstance(domain, str):
+                domain = domain.strip() or 'login'
+            else:
+                domain = 'login'
             
             sf_kwargs = {
                 'username': username,
@@ -1677,20 +1686,82 @@ def salesforce_test_connection():
             }
             
             # Only add security_token if provided and not empty
-            security_token = sf_config.get('security_token', '').strip() if sf_config.get('security_token') else None
-            if security_token:
-                sf_kwargs['security_token'] = security_token
+            security_token = None
+            if sf_config.get('security_token'):
+                security_token = str(sf_config.get('security_token')).strip()
+                if security_token:
+                    sf_kwargs['security_token'] = security_token
             
             # Only add OAuth credentials if provided
-            client_id = sf_config.get('client_id', '').strip() if sf_config.get('client_id') else None
-            client_secret = sf_config.get('client_secret', '').strip() if sf_config.get('client_secret') else None
+            client_id = None
+            client_secret = None
+            if sf_config.get('client_id'):
+                client_id = str(sf_config.get('client_id')).strip()
+            if sf_config.get('client_secret'):
+                client_secret = str(sf_config.get('client_secret')).strip()
+            
             if client_id and client_secret:
                 sf_kwargs['consumer_key'] = client_id
                 sf_kwargs['consumer_secret'] = client_secret
             
             logger.info(f"Attempting Salesforce connection with username: {username}, domain: {domain}, has_token: {bool(security_token)}, has_oauth: {bool(client_id and client_secret)}")
+            logger.info(f"Salesforce kwargs keys: {list(sf_kwargs.keys())}")
+            logger.info(f"Username length: {len(username)}, Password length: {len(password) if password else 0}")
             
-            sf = Salesforce(**sf_kwargs)
+            # Verify we have the minimum required parameters
+            if not username or not password:
+                return jsonify({
+                    'success': False,
+                    'error': 'Username and password are required and cannot be empty',
+                    'debug': {
+                        'username': username[:10] + '...' if len(username) > 10 else username,
+                        'username_length': len(username),
+                        'password_length': len(password) if password else 0,
+                        'has_password': bool(password)
+                    }
+                }), 400
+            
+            # Try to initialize Salesforce client
+            try:
+                # Log the exact kwargs being passed (without password value)
+                safe_kwargs = {k: ('***' if k == 'password' else v) for k, v in sf_kwargs.items()}
+                logger.info(f"Calling Salesforce with kwargs: {safe_kwargs}")
+                
+                sf = Salesforce(**sf_kwargs)
+                
+                # Verify connection by checking if instance_url is set
+                if not hasattr(sf, 'sf_instance_url') or not sf.sf_instance_url:
+                    logger.warning("Salesforce client created but instance_url not set")
+                    
+            except Exception as init_err:
+                error_msg = str(init_err)
+                logger.error(f"Error creating Salesforce client: {error_msg}")
+                logger.error(f"Exception type: {type(init_err).__name__}")
+                import traceback
+                logger.error(traceback.format_exc())
+                
+                # Check if it's the specific error about login information
+                if 'login information' in error_msg.lower() or 'instance and token' in error_msg.lower():
+                    return jsonify({
+                        'success': False,
+                        'error': 'Salesforce authentication failed. Please verify your credentials.',
+                        'details': 'The library requires username, password, and optionally a security token. If your IP is not whitelisted, you need a security token.',
+                        'debug': {
+                            'username_provided': bool(username),
+                            'password_provided': bool(password),
+                            'security_token_provided': bool(security_token),
+                            'kwargs_keys': list(sf_kwargs.keys())
+                        }
+                    }), 401
+                
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to initialize Salesforce client: {error_msg}',
+                    'debug': {
+                        'exception_type': type(init_err).__name__,
+                        'kwargs_keys': list(sf_kwargs.keys())
+                    }
+                }), 400
             
             # Test connection by making a simple query
             test_query = "SELECT Id FROM User LIMIT 1"
