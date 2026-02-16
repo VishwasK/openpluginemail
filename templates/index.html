@@ -160,17 +160,6 @@
                 </div>
                 
                 <div id="salesforce-tab" class="tab-content" style="display: none;">
-                    <div class="mfa-info" style="margin-bottom: 20px;">
-                        <h3>🔒 Security Information</h3>
-                        <p><strong>How your credentials are protected:</strong></p>
-                        <ul style="margin-left: 20px;">
-                            <li><strong>HTTPS Encryption:</strong> All data is encrypted in transit using HTTPS/TLS. Your credentials cannot be intercepted during transmission.</li>
-                            <li><strong>Local Storage:</strong> Credentials are stored only in your browser's localStorage. They are never stored on our servers.</li>
-                            <li><strong>No Server Storage:</strong> Credentials are sent with each request but never saved on the server.</li>
-                            <li><strong>Browser Security:</strong> localStorage is only accessible to JavaScript from the same domain (same-origin policy).</li>
-                        </ul>
-                        <p style="margin-top: 10px;"><strong>Note:</strong> If you're on a shared computer, clear your browser data when done. Consider using OAuth (Client ID/Secret) for better security.</p>
-                    </div>
                     <form id="salesforceCredentialsForm">
                         <div class="form-group">
                             <label for="sfUsername">Salesforce Username *</label>
@@ -193,87 +182,41 @@
                             >
                         </div>
                         <div class="form-group">
-                            <label for="sfSecurityToken">Security Token <span style="color: var(--text-secondary); font-weight: normal;">(Leave empty if IP not restricted)</span></label>
+                            <label for="sfSecurityToken">Security Token <span style="color: var(--text-secondary); font-weight: normal;">(Optional)</span></label>
                             <input 
                                 type="password" 
                                 id="sfSecurityToken" 
                                 name="sfSecurityToken" 
-                                placeholder="Leave empty if your IP is not restricted"
+                                placeholder="Optional"
                             >
-                            <small class="help-text">
-                                <strong>Only needed if:</strong> Your IP is restricted OR you have MFA enabled. If your IP is not restricted and you don't have MFA, <strong>leave this field empty</strong>. Get token from: Setup → My Personal Information → Reset My Security Token
-                            </small>
                         </div>
                         <div class="form-group">
-                            <label for="sfOrganizationId">Organization ID <span style="color: var(--text-secondary); font-weight: normal;">(Optional - for IP-whitelisted orgs)</span></label>
+                            <label for="sfOrganizationId">Organization ID <span style="color: var(--text-secondary); font-weight: normal;">(Optional)</span></label>
                             <input 
                                 type="text" 
                                 id="sfOrganizationId" 
                                 name="sfOrganizationId" 
                                 placeholder="00Dxxxxxxxxxxxxxxx"
                             >
-                            <small class="help-text">
-                                Optional. For orgs without IP restrictions, you may need your Organization ID. Find it in: Setup → Company Information → Organization ID (starts with 00D)
-                            </small>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="sfClientId">Client ID (OAuth) <span style="color: var(--text-secondary); font-weight: normal;">*Required if SOAP API disabled</span></label>
+                                <label for="sfClientId">Client ID (Consumer Key) *</label>
                                 <input 
                                     type="text" 
                                     id="sfClientId" 
                                     name="sfClientId" 
-                                    placeholder="Connected App Client ID"
+                                    placeholder="Consumer Key from Connected App"
                                 >
                             </div>
                             <div class="form-group">
-                                <label for="sfClientSecret">Client Secret (OAuth) <span style="color: var(--text-secondary); font-weight: normal;">*Required if SOAP API disabled</span></label>
+                                <label for="sfClientSecret">Client Secret (Consumer Secret) *</label>
                                 <input 
                                     type="password" 
                                     id="sfClientSecret" 
                                     name="sfClientSecret" 
-                                    placeholder="Connected App Client Secret"
+                                    placeholder="Consumer Secret from Connected App"
                                 >
-                            </div>
-                        </div>
-                        <div class="mfa-info" style="margin-top: 15px; margin-bottom: 15px;">
-                            <h4>🔐 OAuth Authentication (Required if SOAP API is disabled)</h4>
-                            <p>If your org has SOAP API login disabled, you <strong>must</strong> use OAuth with a Connected App:</p>
-                            <ol style="margin-left: 20px;">
-                                <li>Create a Connected App in Salesforce: Setup → App Manager → New Connected App</li>
-                                <li>Enable OAuth Settings</li>
-                                <li><strong>Callback URL:</strong> Use one of these (doesn't need to be your app URL):
-                                    <ul style="margin-top: 5px;">
-                                        <li><code>https://login.salesforce.com/services/oauth2/success</code> (Production)</li>
-                                        <li><code>https://test.salesforce.com/services/oauth2/success</code> (Sandbox)</li>
-                                        <li>Or simply: <code>https://login.salesforce.com</code></li>
-                                    </ul>
-                                </li>
-                                <li>Select OAuth Scopes (at minimum: "Access and manage your data (api)")</li>
-                                <li><strong>IMPORTANT:</strong> In "Flow Enablement" section, enable:
-                                    <ul style="margin-top: 5px;">
-                                        <li><strong>"Enable Authorization Code and Credentials Flow"</strong> (required for username-password flow)</li>
-                                        <li>OR look for "Enable OAuth Username-Password Flow" if available</li>
-                                    </ul>
-                                    <p style="color: #d32f2f; margin-top: 5px;"><strong>⚠️ "Enable Client Credentials Flow" alone is NOT sufficient - you need Authorization Code flow enabled!</strong></p>
-                                </li>
-                                <li>Copy the Consumer Key (Client ID) and Consumer Secret</li>
-                                <li>Enter them in the fields above along with your username and password</li>
-                            </ol>
-                            <p style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-                                <strong>⚠️ IMPORTANT - Callback URL MUST match:</strong> The callback URL in your Connected App <strong>must be exactly</strong> <code>https://login.salesforce.com/services/oauth2/success</code> (for Production) or <code>https://test.salesforce.com/services/oauth2/success</code> (for Sandbox). Our code sends this URL with every token request, and Salesforce will reject the request if it doesn't match what's configured in your Connected App. Do NOT use your Heroku app URL as the callback.
-                            </p>
-                            <div style="margin-top: 10px; padding: 10px; background: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">
-                                <strong>⚠️ Important:</strong> If you get "authentication failure" or "invalid_grant" error, check:
-                                <ul style="margin: 5px 0 0 20px;">
-                                    <li>✓ Username and password are correct</li>
-                                    <li>✓ "Enable Authorization Code and Credentials Flow" is checked (NOT just Client Credentials)</li>
-                                    <li>✓ Connected App has OAuth scopes: "Access and manage your data (api)"</li>
-                                    <li>✓ <strong>Connected App "Permitted Users"</strong> is set to "All users may self-authorize" OR your user is in the permitted list</li>
-                                    <li>✓ Connected App status is "Active" (not Inactive)</li>
-                                    <li>✓ Correct domain selected (Production vs Sandbox)</li>
-                                    <li>✓ Client ID and Client Secret are correct (Consumer Key and Consumer Secret)</li>
-                                </ul>
                             </div>
                         </div>
                         <div class="form-group">
