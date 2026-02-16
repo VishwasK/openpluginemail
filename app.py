@@ -1730,13 +1730,41 @@ def salesforce_test_connection():
                     if token_response.status_code != 200:
                         error_detail = token_response.text
                         logger.error(f"OAuth token request failed: {error_detail}")
+                        
+                        # Parse error response if JSON
+                        error_json = None
+                        try:
+                            error_json = token_response.json()
+                        except:
+                            pass
+                        
+                        # Provide helpful error messages
+                        error_message = 'OAuth authentication failed'
+                        details = f'Token request failed: {error_detail[:500]}'
+                        
+                        if error_json:
+                            error_desc = error_json.get('error_description', '')
+                            error_type = error_json.get('error', '')
+                            
+                            if 'invalid_client' in error_type.lower():
+                                error_message = 'Invalid Client ID or Client Secret'
+                                details = 'Please verify your Client ID and Client Secret are correct.'
+                            elif 'invalid_grant' in error_type.lower():
+                                error_message = 'Invalid credentials'
+                                details = 'Please verify your username and password are correct. If you have MFA enabled, you may need a security token appended to your password.'
+                            elif 'invalid_request' in error_type.lower():
+                                error_message = 'Invalid OAuth request'
+                                details = f'Error: {error_desc}. Make sure your Connected App is configured correctly with OAuth enabled.'
+                        
                         return jsonify({
                             'success': False,
-                            'error': 'OAuth authentication failed',
-                            'details': f'Token request failed: {error_detail}',
+                            'error': error_message,
+                            'details': details,
                             'debug': {
                                 'status_code': token_response.status_code,
-                                'response': error_detail[:500]
+                                'response': error_detail[:500],
+                                'error_type': error_json.get('error') if error_json else None,
+                                'error_description': error_json.get('error_description') if error_json else None
                             }
                         }), 401
                     
