@@ -250,7 +250,13 @@
                                     </ul>
                                 </li>
                                 <li>Select OAuth Scopes (at minimum: "Access and manage your data (api)")</li>
-                                <li>Enable "Enable OAuth Username-Password Flow" (if available in your org)</li>
+                                <li><strong>IMPORTANT:</strong> In "Flow Enablement" section, enable:
+                                    <ul style="margin-top: 5px;">
+                                        <li><strong>"Enable Authorization Code and Credentials Flow"</strong> (required for username-password flow)</li>
+                                        <li>OR look for "Enable OAuth Username-Password Flow" if available</li>
+                                    </ul>
+                                    <p style="color: #d32f2f; margin-top: 5px;"><strong>⚠️ "Enable Client Credentials Flow" alone is NOT sufficient - you need Authorization Code flow enabled!</strong></p>
+                                </li>
                                 <li>Copy the Consumer Key (Client ID) and Consumer Secret</li>
                                 <li>Enter them in the fields above along with your username and password</li>
                             </ol>

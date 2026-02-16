@@ -1759,8 +1759,9 @@ def salesforce_test_connection():
                                     details += 'This usually means: '
                                     troubleshooting.append('Username or password is incorrect')
                                     troubleshooting.append('If MFA is enabled, you may need to append your security token to the password')
-                                    troubleshooting.append('Make sure "Enable OAuth Username-Password Flow" is checked in your Connected App')
+                                    troubleshooting.append('<strong>CRITICAL:</strong> Make sure "Enable Authorization Code and Credentials Flow" is checked in your Connected App (NOT just "Client Credentials Flow")')
                                     troubleshooting.append('Verify your Connected App has the required OAuth scopes (at minimum: "Access and manage your data (api)")')
+                                    troubleshooting.append('"Client Credentials Flow" alone does NOT support username-password authentication')
                                 
                                 return jsonify({
                                     'success': False,
