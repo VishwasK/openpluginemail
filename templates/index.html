@@ -26,6 +26,7 @@
                 <div class="tabs">
                     <button class="tab-btn active" data-tab="smtp-tab">SMTP (Email)</button>
                     <button class="tab-btn" data-tab="openai-tab">OpenAI (Stories)</button>
+                    <button class="tab-btn" data-tab="salesforce-tab">Salesforce</button>
                 </div>
                 
                 <div id="smtp-tab" class="tab-content active" style="display: block;">
@@ -153,6 +154,79 @@
                             </button>
                             <button type="button" class="btn btn-secondary" id="clearOpenAIBtn" style="display: none;">
                                 Clear Saved Key
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div id="salesforce-tab" class="tab-content" style="display: none;">
+                    <form id="salesforceCredentialsForm">
+                        <div class="form-group">
+                            <label for="sfUsername">Salesforce Username *</label>
+                            <input 
+                                type="text" 
+                                id="sfUsername" 
+                                name="sfUsername" 
+                                placeholder="your-username@example.com" 
+                                required
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label for="sfPassword">Salesforce Password *</label>
+                            <input 
+                                type="password" 
+                                id="sfPassword" 
+                                name="sfPassword" 
+                                placeholder="Your Salesforce password" 
+                                required
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label for="sfSecurityToken">Security Token</label>
+                            <input 
+                                type="password" 
+                                id="sfSecurityToken" 
+                                name="sfSecurityToken" 
+                                placeholder="Security token (optional)"
+                            >
+                            <small class="help-text">
+                                Get your security token from: Setup → My Personal Information → Reset My Security Token
+                            </small>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="sfClientId">Client ID (OAuth - optional)</label>
+                                <input 
+                                    type="text" 
+                                    id="sfClientId" 
+                                    name="sfClientId" 
+                                    placeholder="Connected App Client ID"
+                                >
+                            </div>
+                            <div class="form-group">
+                                <label for="sfClientSecret">Client Secret (OAuth - optional)</label>
+                                <input 
+                                    type="password" 
+                                    id="sfClientSecret" 
+                                    name="sfClientSecret" 
+                                    placeholder="Connected App Client Secret"
+                                >
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="sfDomain">Domain</label>
+                            <select id="sfDomain" name="sfDomain">
+                                <option value="login" selected>Production (login)</option>
+                                <option value="test">Sandbox (test)</option>
+                                <option value="custom">Custom Domain</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                Save Salesforce Credentials
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="clearSalesforceBtn" style="display: none;">
+                                Clear Saved Credentials
                             </button>
                         </div>
                     </form>
@@ -372,6 +446,149 @@
                     </button>
                 </form>
                 <div id="searchSummarizeResult" class="story-result" style="display: none;"></div>
+            </div>
+
+            <div class="card">
+                <h2>🔵 Query Salesforce</h2>
+                <form id="salesforceQueryForm">
+                    <div class="form-group">
+                        <label for="soqlQuery">SOQL Query *</label>
+                        <textarea 
+                            id="soqlQuery" 
+                            name="soqlQuery" 
+                            rows="4" 
+                            placeholder="SELECT Id, Name, Industry FROM Account LIMIT 10" 
+                            required
+                        ></textarea>
+                        <small class="help-text">
+                            Enter a valid SOQL query. Example: SELECT Id, Name FROM Account LIMIT 10
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="salesforceQueryBtn">
+                        <span class="btn-text">Execute Query</span>
+                        <span class="btn-loader" style="display: none;">Querying...</span>
+                    </button>
+                </form>
+                <div id="salesforceQueryResult" class="story-result" style="display: none;"></div>
+            </div>
+
+            <div class="card">
+                <h2>➕ Create Salesforce Record</h2>
+                <form id="salesforceCreateForm">
+                    <div class="form-group">
+                        <label for="createObjectType">Object Type *</label>
+                        <input 
+                            type="text" 
+                            id="createObjectType" 
+                            name="createObjectType" 
+                            placeholder="Account, Contact, Opportunity, etc." 
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="createFields">Fields (JSON) *</label>
+                        <textarea 
+                            id="createFields" 
+                            name="createFields" 
+                            rows="6" 
+                            placeholder='{"Name": "Acme Corp", "Industry": "Technology"}' 
+                            required
+                        ></textarea>
+                        <small class="help-text">
+                            Enter field values as JSON. Example: {"Name": "Acme Corp", "Industry": "Technology"}
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="salesforceCreateBtn">
+                        <span class="btn-text">Create Record</span>
+                        <span class="btn-loader" style="display: none;">Creating...</span>
+                    </button>
+                </form>
+                <div id="salesforceCreateResult" class="story-result" style="display: none;"></div>
+            </div>
+
+            <div class="card">
+                <h2>✏️ Update Salesforce Record</h2>
+                <form id="salesforceUpdateForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="updateObjectType">Object Type *</label>
+                            <input 
+                                type="text" 
+                                id="updateObjectType" 
+                                name="updateObjectType" 
+                                placeholder="Account" 
+                                required
+                            >
+                        </div>
+                        <div class="form-group">
+                            <label for="updateRecordId">Record ID *</label>
+                            <input 
+                                type="text" 
+                                id="updateRecordId" 
+                                name="updateRecordId" 
+                                placeholder="001xx000003DGbQ" 
+                                required
+                            >
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="updateFields">Fields to Update (JSON) *</label>
+                        <textarea 
+                            id="updateFields" 
+                            name="updateFields" 
+                            rows="4" 
+                            placeholder='{"Industry": "Technology", "Phone": "555-1234"}' 
+                            required
+                        ></textarea>
+                        <small class="help-text">
+                            Enter field values as JSON. Example: {"Industry": "Technology"}
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="salesforceUpdateBtn">
+                        <span class="btn-text">Update Record</span>
+                        <span class="btn-loader" style="display: none;">Updating...</span>
+                    </button>
+                </form>
+                <div id="salesforceUpdateResult" class="story-result" style="display: none;"></div>
+            </div>
+
+            <div class="card">
+                <h2>⚡ Execute Agentforce Action</h2>
+                <form id="salesforceActionForm">
+                    <div class="form-group">
+                        <label for="actionName">Action Name *</label>
+                        <input 
+                            type="text" 
+                            id="actionName" 
+                            name="actionName" 
+                            placeholder="CreateAccount" 
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="actionParams">Action Parameters (JSON - optional)</label>
+                        <textarea 
+                            id="actionParams" 
+                            name="actionParams" 
+                            rows="4" 
+                            placeholder='{"name": "Acme Corp", "industry": "Technology"}'
+                        ></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="actionRecordId">Record ID (optional)</label>
+                        <input 
+                            type="text" 
+                            id="actionRecordId" 
+                            name="actionRecordId" 
+                            placeholder="001xx000003DGbQ"
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="salesforceActionBtn">
+                        <span class="btn-text">Execute Action</span>
+                        <span class="btn-loader" style="display: none;">Executing...</span>
+                    </button>
+                </form>
+                <div id="salesforceActionResult" class="story-result" style="display: none;"></div>
             </div>
 
             <div class="card">

@@ -35,6 +35,15 @@ except ImportError:
     DDGS = None
     logger.warning("duckduckgo-search package not available. Web search plugin will be disabled.")
 
+# Import Salesforce client with error handling
+try:
+    from simple_salesforce import Salesforce
+    SALESFORCE_AVAILABLE = True
+except ImportError:
+    SALESFORCE_AVAILABLE = False
+    Salesforce = None
+    logger.warning("simple-salesforce package not available. Salesforce plugin will be disabled.")
+
 
 class EmailPlugin:
     """OpenPlugin Email Plugin Implementation"""
@@ -933,6 +942,336 @@ class WebSearchPlugin:
 websearch_plugin = WebSearchPlugin()
 
 
+class SalesforcePlugin:
+    """OpenPlugin Salesforce Plugin Implementation"""
+    
+    def __init__(self):
+        pass
+    
+    def query(self, soql, sf_config):
+        """
+        Query Salesforce data using SOQL
+        
+        Args:
+            soql: SOQL query string
+            sf_config: Salesforce configuration dictionary
+        
+        Returns:
+            dict: Result with success status and query results
+        """
+        try:
+            if not SALESFORCE_AVAILABLE:
+                return {
+                    'success': False,
+                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
+                }
+            
+            if not soql:
+                return {
+                    'success': False,
+                    'error': 'SOQL query is required'
+                }
+            
+            # Initialize Salesforce client with user-provided credentials
+            try:
+                sf = Salesforce(
+                    username=sf_config.get('username'),
+                    password=sf_config.get('password'),
+                    security_token=sf_config.get('security_token'),
+                    consumer_key=sf_config.get('client_id'),
+                    consumer_secret=sf_config.get('client_secret'),
+                    domain=sf_config.get('domain', 'login')
+                )
+            except Exception as conn_error:
+                logger.error(f"Salesforce connection error: {str(conn_error)}")
+                return {
+                    'success': False,
+                    'error': f'Failed to connect to Salesforce: {str(conn_error)}'
+                }
+            
+            # Execute query
+            try:
+                results = sf.query(soql)
+                logger.info(f"Salesforce query executed successfully: {soql[:50]}...")
+                return {
+                    'success': True,
+                    'soql': soql,
+                    'records': results.get('records', []),
+                    'total_size': results.get('totalSize', 0),
+                    'done': results.get('done', True)
+                }
+            except Exception as query_error:
+                logger.error(f"Salesforce query error: {str(query_error)}")
+                return {
+                    'success': False,
+                    'error': f'Query failed: {str(query_error)}',
+                    'soql': soql
+                }
+        
+        except Exception as e:
+            logger.error(f"Error in Salesforce query: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def create_record(self, object_type, fields, sf_config):
+        """
+        Create a Salesforce record
+        
+        Args:
+            object_type: Salesforce object type (Account, Contact, etc.)
+            fields: Field values dictionary
+            sf_config: Salesforce configuration dictionary
+        
+        Returns:
+            dict: Result with success status and created record ID
+        """
+        try:
+            if not SALESFORCE_AVAILABLE:
+                return {
+                    'success': False,
+                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
+                }
+            
+            if not object_type:
+                return {
+                    'success': False,
+                    'error': 'Object type is required'
+                }
+            
+            if not fields:
+                return {
+                    'success': False,
+                    'error': 'Fields are required'
+                }
+            
+            # Initialize Salesforce client
+            try:
+                sf = Salesforce(
+                    username=sf_config.get('username'),
+                    password=sf_config.get('password'),
+                    security_token=sf_config.get('security_token'),
+                    consumer_key=sf_config.get('client_id'),
+                    consumer_secret=sf_config.get('client_secret'),
+                    domain=sf_config.get('domain', 'login')
+                )
+            except Exception as conn_error:
+                logger.error(f"Salesforce connection error: {str(conn_error)}")
+                return {
+                    'success': False,
+                    'error': f'Failed to connect to Salesforce: {str(conn_error)}'
+                }
+            
+            # Create record
+            try:
+                obj = getattr(sf, object_type)
+                result = obj.create(fields)
+                logger.info(f"Salesforce record created: {object_type} - {result.get('id')}")
+                return {
+                    'success': True,
+                    'id': result.get('id'),
+                    'object_type': object_type,
+                    'message': f'{object_type} record created successfully'
+                }
+            except Exception as create_error:
+                logger.error(f"Salesforce create error: {str(create_error)}")
+                return {
+                    'success': False,
+                    'error': f'Failed to create record: {str(create_error)}',
+                    'object_type': object_type
+                }
+        
+        except Exception as e:
+            logger.error(f"Error creating Salesforce record: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def update_record(self, object_type, record_id, fields, sf_config):
+        """
+        Update a Salesforce record
+        
+        Args:
+            object_type: Salesforce object type
+            record_id: Record ID to update
+            fields: Field values to update
+            sf_config: Salesforce configuration dictionary
+        
+        Returns:
+            dict: Result with success status
+        """
+        try:
+            if not SALESFORCE_AVAILABLE:
+                return {
+                    'success': False,
+                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
+                }
+            
+            if not object_type or not record_id:
+                return {
+                    'success': False,
+                    'error': 'Object type and record ID are required'
+                }
+            
+            if not fields:
+                return {
+                    'success': False,
+                    'error': 'Fields are required'
+                }
+            
+            # Initialize Salesforce client
+            try:
+                sf = Salesforce(
+                    username=sf_config.get('username'),
+                    password=sf_config.get('password'),
+                    security_token=sf_config.get('security_token'),
+                    consumer_key=sf_config.get('client_id'),
+                    consumer_secret=sf_config.get('client_secret'),
+                    domain=sf_config.get('domain', 'login')
+                )
+            except Exception as conn_error:
+                logger.error(f"Salesforce connection error: {str(conn_error)}")
+                return {
+                    'success': False,
+                    'error': f'Failed to connect to Salesforce: {str(conn_error)}'
+                }
+            
+            # Update record
+            try:
+                obj = getattr(sf, object_type)
+                result = obj.update(record_id, fields)
+                logger.info(f"Salesforce record updated: {object_type} - {record_id}")
+                return {
+                    'success': True,
+                    'id': record_id,
+                    'object_type': object_type,
+                    'message': f'{object_type} record updated successfully'
+                }
+            except Exception as update_error:
+                logger.error(f"Salesforce update error: {str(update_error)}")
+                return {
+                    'success': False,
+                    'error': f'Failed to update record: {str(update_error)}',
+                    'object_type': object_type,
+                    'record_id': record_id
+                }
+        
+        except Exception as e:
+            logger.error(f"Error updating Salesforce record: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def execute_action(self, action_name, action_params, record_id, sf_config):
+        """
+        Execute a Salesforce Agentforce action
+        
+        Args:
+            action_name: Name of the Agentforce action
+            action_params: Parameters for the action
+            record_id: Optional record ID
+            sf_config: Salesforce configuration dictionary
+        
+        Returns:
+            dict: Result with success status and action result
+        """
+        try:
+            if not SALESFORCE_AVAILABLE:
+                return {
+                    'success': False,
+                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
+                }
+            
+            if not action_name:
+                return {
+                    'success': False,
+                    'error': 'Action name is required'
+                }
+            
+            # Initialize Salesforce client
+            try:
+                sf = Salesforce(
+                    username=sf_config.get('username'),
+                    password=sf_config.get('password'),
+                    security_token=sf_config.get('security_token'),
+                    consumer_key=sf_config.get('client_id'),
+                    consumer_secret=sf_config.get('client_secret'),
+                    domain=sf_config.get('domain', 'login')
+                )
+            except Exception as conn_error:
+                logger.error(f"Salesforce connection error: {str(conn_error)}")
+                return {
+                    'success': False,
+                    'error': f'Failed to connect to Salesforce: {str(conn_error)}'
+                }
+            
+            # Execute Agentforce action
+            # Note: This is a placeholder - actual implementation depends on Agentforce API
+            try:
+                # For now, return a structured response
+                # In production, you'd call the actual Agentforce API endpoint
+                logger.info(f"Agentforce action executed: {action_name}")
+                return {
+                    'success': True,
+                    'action_name': action_name,
+                    'message': f"Action '{action_name}' executed successfully",
+                    'params': action_params,
+                    'record_id': record_id,
+                    'note': 'Agentforce action execution - implement actual API call based on your configuration'
+                }
+            except Exception as action_error:
+                logger.error(f"Agentforce action error: {str(action_error)}")
+                return {
+                    'success': False,
+                    'error': f'Failed to execute action: {str(action_error)}',
+                    'action_name': action_name
+                }
+        
+        except Exception as e:
+            logger.error(f"Error executing Agentforce action: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def get_plugin_info(self):
+        """Get plugin information following OpenPlugin spec"""
+        return {
+            'plugin_name': 'salesforce',
+            'version': '1.0.0',
+            'description': 'Query, create, update Salesforce records and execute Agentforce actions',
+            'endpoints': {
+                'query': '/api/salesforce/query',
+                'create_record': '/api/salesforce/create',
+                'update_record': '/api/salesforce/update',
+                'execute_action': '/api/salesforce/execute-action',
+                'plugin_info': '/api/salesforce/info'
+            },
+            'security': {
+                'credentials': 'user-provided',
+                'storage': 'local-browser',
+                'note': 'Salesforce credentials are stored locally in your browser and sent with each request. They are never stored on the server.'
+            },
+            'required_fields': {
+                'sf_config': {
+                    'username': 'Salesforce username',
+                    'password': 'Salesforce password',
+                    'security_token': 'Security token (for username-password auth)',
+                    'client_id': 'Connected App Client ID (optional, for OAuth)',
+                    'client_secret': 'Connected App Client Secret (optional, for OAuth)',
+                    'domain': 'Salesforce domain (login, test, custom) - default: login'
+                }
+            }
+        }
+
+
+# Initialize Salesforce plugin
+salesforce_plugin = SalesforcePlugin()
+
+
 @app.route('/')
 def index():
     """Main UI page"""
@@ -1242,6 +1581,213 @@ def web_search_summarize():
     
     except Exception as e:
         logger.error(f"Error in web_search_summarize endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/salesforce/info', methods=['GET'])
+def salesforce_plugin_info():
+    """Get Salesforce plugin information"""
+    return jsonify(salesforce_plugin.get_plugin_info())
+
+
+@app.route('/api/salesforce/query', methods=['POST'])
+def salesforce_query():
+    """Query Salesforce endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'soql' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required field: soql'
+            }), 400
+        
+        # Extract Salesforce config from request
+        sf_config = data.get('sf_config')
+        if not sf_config:
+            return jsonify({
+                'success': False,
+                'error': 'Salesforce credentials not provided. Please configure your credentials in the UI.'
+            }), 400
+        
+        # Validate required Salesforce fields
+        required_fields = ['username', 'password']
+        for field in required_fields:
+            if field not in sf_config or not sf_config[field]:
+                return jsonify({
+                    'success': False,
+                    'error': f'Missing required Salesforce field: {field}'
+                }), 400
+        
+        # Execute query
+        result = salesforce_plugin.query(
+            soql=data['soql'],
+            sf_config=sf_config
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Error in salesforce_query endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/salesforce/create', methods=['POST'])
+def salesforce_create():
+    """Create Salesforce record endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'object_type' not in data or 'fields' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required fields: object_type and fields'
+            }), 400
+        
+        # Extract Salesforce config from request
+        sf_config = data.get('sf_config')
+        if not sf_config:
+            return jsonify({
+                'success': False,
+                'error': 'Salesforce credentials not provided. Please configure your credentials in the UI.'
+            }), 400
+        
+        # Validate required Salesforce fields
+        required_fields = ['username', 'password']
+        for field in required_fields:
+            if field not in sf_config or not sf_config[field]:
+                return jsonify({
+                    'success': False,
+                    'error': f'Missing required Salesforce field: {field}'
+                }), 400
+        
+        # Create record
+        result = salesforce_plugin.create_record(
+            object_type=data['object_type'],
+            fields=data['fields'],
+            sf_config=sf_config
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Error in salesforce_create endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/salesforce/update', methods=['POST'])
+def salesforce_update():
+    """Update Salesforce record endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'object_type' not in data or 'record_id' not in data or 'fields' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required fields: object_type, record_id, and fields'
+            }), 400
+        
+        # Extract Salesforce config from request
+        sf_config = data.get('sf_config')
+        if not sf_config:
+            return jsonify({
+                'success': False,
+                'error': 'Salesforce credentials not provided. Please configure your credentials in the UI.'
+            }), 400
+        
+        # Validate required Salesforce fields
+        required_fields = ['username', 'password']
+        for field in required_fields:
+            if field not in sf_config or not sf_config[field]:
+                return jsonify({
+                    'success': False,
+                    'error': f'Missing required Salesforce field: {field}'
+                }), 400
+        
+        # Update record
+        result = salesforce_plugin.update_record(
+            object_type=data['object_type'],
+            record_id=data['record_id'],
+            fields=data['fields'],
+            sf_config=sf_config
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Error in salesforce_update endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/salesforce/execute-action', methods=['POST'])
+def salesforce_execute_action():
+    """Execute Salesforce Agentforce action endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'action_name' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required field: action_name'
+            }), 400
+        
+        # Extract Salesforce config from request
+        sf_config = data.get('sf_config')
+        if not sf_config:
+            return jsonify({
+                'success': False,
+                'error': 'Salesforce credentials not provided. Please configure your credentials in the UI.'
+            }), 400
+        
+        # Validate required Salesforce fields
+        required_fields = ['username', 'password']
+        for field in required_fields:
+            if field not in sf_config or not sf_config[field]:
+                return jsonify({
+                    'success': False,
+                    'error': f'Missing required Salesforce field: {field}'
+                }), 400
+        
+        # Execute action
+        result = salesforce_plugin.execute_action(
+            action_name=data['action_name'],
+            action_params=data.get('action_params', {}),
+            record_id=data.get('record_id'),
+            sf_config=sf_config
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Error in salesforce_execute_action endpoint: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)

@@ -4,6 +4,7 @@
 const CREDENTIALS_KEY = 'openplugin_email_credentials';
 const OPENAI_KEY = 'openplugin_openai_api_key';
 const OPENAI_MODEL_KEY = 'openplugin_openai_model';
+const SALESFORCE_KEY = 'openplugin_salesforce_credentials';
 
 // Load saved credentials from localStorage
 function loadCredentials() {
@@ -696,6 +697,7 @@ document.getElementById('searchSummarizeForm').addEventListener('submit', async 
 document.addEventListener('DOMContentLoaded', () => {
     loadCredentials();
     loadOpenAICredentials();
+    loadSalesforceCredentials();
     initTabs();
     checkHealth();
     loadPluginInfo();
