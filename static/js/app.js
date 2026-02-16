@@ -566,239 +566,136 @@ document.getElementById('openaiCredentialsForm').addEventListener('submit', (e) 
 
 document.getElementById('clearOpenAIBtn').addEventListener('click', clearOpenAICredentials);
 
-// Salesforce Credentials Management
-function loadSalesforceCredentials() {
-    try {
-        const saved = localStorage.getItem(SALESFORCE_KEY);
-        if (saved) {
-            const creds = JSON.parse(saved);
-            document.getElementById('sfUsername').value = creds.username || '';
-            document.getElementById('sfPassword').value = creds.password || '';
-            document.getElementById('sfSecurityToken').value = creds.security_token || '';
-            document.getElementById('sfOrganizationId').value = creds.organization_id || '';
-            document.getElementById('sfClientId').value = creds.client_id || '';
-            document.getElementById('sfClientSecret').value = creds.client_secret || '';
-            document.getElementById('sfDomain').value = creds.domain || 'login';
-            document.getElementById('clearSalesforceBtn').style.display = 'inline-block';
-        }
-    } catch (error) {
-        console.error('Error loading Salesforce credentials:', error);
-    }
-}
+// Salesforce OAuth Session Management
+const SF_SESSION_KEY = 'openplugin_salesforce_session';
 
-function saveSalesforceCredentials() {
-    const username = document.getElementById('sfUsername').value.trim();
-    const password = document.getElementById('sfPassword').value;
-    const securityToken = document.getElementById('sfSecurityToken').value.trim();
-    const organizationId = document.getElementById('sfOrganizationId').value.trim();
-    const clientId = document.getElementById('sfClientId').value.trim();
-    const clientSecret = document.getElementById('sfClientSecret').value;
-    const domain = document.getElementById('sfDomain').value || 'login';
-    
-    const credentials = {
-        username: username,
-        password: password,
-        security_token: securityToken || null,
-        organization_id: organizationId || null,
-        client_id: clientId || null,
-        client_secret: clientSecret || null,
-        domain: domain
-    };
-    
-    // Remove null/empty values to avoid sending empty strings
-    if (!credentials.security_token) delete credentials.security_token;
-    if (!credentials.organization_id) delete credentials.organization_id;
-    if (!credentials.client_id) delete credentials.client_id;
-    if (!credentials.client_secret) delete credentials.client_secret;
-    
-    if (credentials.username && credentials.password) {
-        localStorage.setItem(SALESFORCE_KEY, JSON.stringify(credentials));
-        document.getElementById('clearSalesforceBtn').style.display = 'inline-block';
-        return credentials;
+function getSalesforceSession() {
+    try {
+        const saved = localStorage.getItem(SF_SESSION_KEY);
+        if (saved) {
+            return JSON.parse(saved);
+        }
+    } catch (e) {
+        console.error('Error reading Salesforce session:', e);
     }
     return null;
 }
 
 function getSalesforceCredentials() {
-    const saved = localStorage.getItem(SALESFORCE_KEY);
-    if (saved) {
-        const creds = JSON.parse(saved);
-        // Ensure we don't send empty strings
-        if (creds.security_token === '') delete creds.security_token;
-        if (creds.organization_id === '') delete creds.organization_id;
-        if (creds.client_id === '') delete creds.client_id;
-        if (creds.client_secret === '') delete creds.client_secret;
-        return creds;
+    const session = getSalesforceSession();
+    if (session && session.access_token && session.instance_url) {
+        return {
+            access_token: session.access_token,
+            instance_url: session.instance_url
+        };
     }
-    
-    // Fallback to form values
-    const username = document.getElementById('sfUsername').value.trim();
-    const password = document.getElementById('sfPassword').value;
-    const securityToken = document.getElementById('sfSecurityToken').value.trim();
-    const organizationId = document.getElementById('sfOrganizationId').value.trim();
-    const clientId = document.getElementById('sfClientId').value.trim();
-    const clientSecret = document.getElementById('sfClientSecret').value;
-    const domain = document.getElementById('sfDomain').value || 'login';
-    
-    const creds = {
-        username: username,
-        password: password,
-        domain: domain
-    };
-    
-    if (securityToken) creds.security_token = securityToken;
-    if (organizationId) creds.organization_id = organizationId;
-    if (clientId) creds.client_id = clientId;
-    if (clientSecret) creds.client_secret = clientSecret;
-    
-    return creds;
+    return {};
 }
 
-function clearSalesforceCredentials() {
-    if (confirm('Are you sure you want to clear your saved Salesforce credentials?')) {
-        localStorage.removeItem(SALESFORCE_KEY);
-        document.getElementById('salesforceCredentialsForm').reset();
-        document.getElementById('clearSalesforceBtn').style.display = 'none';
+function updateSalesforceUI() {
+    const session = getSalesforceSession();
+    const banner = document.getElementById('sfConnectedBanner');
+    const form = document.getElementById('salesforceCredentialsForm');
+    const instanceDisplay = document.getElementById('sfInstanceDisplay');
+
+    if (session && session.access_token) {
+        banner.style.display = 'flex';
+        banner.style.alignItems = 'center';
+        form.style.display = 'none';
+        instanceDisplay.textContent = session.instance_url || '';
+    } else {
+        banner.style.display = 'none';
+        form.style.display = 'block';
     }
 }
 
-// Handle Salesforce credentials form
+function loadSalesforceCredentials() {
+    try {
+        const saved = localStorage.getItem(SALESFORCE_KEY);
+        if (saved) {
+            const creds = JSON.parse(saved);
+            if (document.getElementById('sfClientId')) {
+                document.getElementById('sfClientId').value = creds.client_id || '';
+            }
+            if (document.getElementById('sfClientSecret')) {
+                document.getElementById('sfClientSecret').value = creds.client_secret || '';
+            }
+            if (document.getElementById('sfDomain')) {
+                document.getElementById('sfDomain').value = creds.domain || 'login';
+            }
+        }
+        updateSalesforceUI();
+    } catch (error) {
+        console.error('Error loading Salesforce credentials:', error);
+    }
+}
+
+// Handle Connect to Salesforce form
 document.getElementById('salesforceCredentialsForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const creds = saveSalesforceCredentials();
-    
-    if (!creds) {
-        const statusDiv = document.getElementById('salesforceConnectionStatus');
-        statusDiv.style.display = 'block';
-        statusDiv.className = 'result-message error';
-        statusDiv.innerHTML = '✗ Please fill in username and password';
-        return;
-    }
-    
-    // Test connection when saving
-    await testSalesforceConnection(creds, true);
-});
-
-// Test Salesforce Connection
-async function testSalesforceConnection(creds = null, showSaveMessage = false) {
-    const testBtn = document.getElementById('testSalesforceBtn');
     const statusDiv = document.getElementById('salesforceConnectionStatus');
-    
-    if (!creds) {
-        creds = getSalesforceCredentials();
-    }
-    
-    if (!creds.username || !creds.password) {
+    const connectBtn = document.getElementById('sfConnectBtn');
+
+    const clientId = document.getElementById('sfClientId').value.trim();
+    const clientSecret = document.getElementById('sfClientSecret').value.trim();
+    const domain = document.getElementById('sfDomain').value || 'login';
+
+    if (!clientId || !clientSecret) {
         statusDiv.style.display = 'block';
         statusDiv.className = 'result-message error';
-        statusDiv.innerHTML = '✗ Please enter username and password first';
+        statusDiv.innerHTML = 'Please enter both Client ID and Client Secret';
         return;
     }
-    
-    testBtn.disabled = true;
-    testBtn.textContent = 'Testing...';
+
+    // Save client credentials for next time
+    localStorage.setItem(SALESFORCE_KEY, JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        domain: domain
+    }));
+
+    connectBtn.disabled = true;
+    connectBtn.textContent = 'Connecting...';
     statusDiv.style.display = 'block';
     statusDiv.className = 'result-message';
-    statusDiv.innerHTML = '🔄 Testing connection...';
-    
-    // Log what we're sending (without password)
-    console.log('Testing Salesforce connection with:', {
-        username: creds.username,
-        has_password: !!creds.password,
-        has_security_token: !!creds.security_token,
-        domain: creds.domain,
-        keys: Object.keys(creds)
-    });
-    
+    statusDiv.innerHTML = 'Redirecting to Salesforce login...';
+
     try {
-        const response = await fetch('/api/salesforce/test-connection', {
+        const response = await fetch('/api/salesforce/authorize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                sf_config: creds
+                client_id: clientId,
+                client_secret: clientSecret,
+                domain: domain
             })
         });
-        
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
-        }
-        
+
         const data = await response.json();
-        
-        // Log response for debugging
-        console.log('Salesforce connection test response:', {
-            success: data.success,
-            error: data.error,
-            debug: data.debug
-        });
-        
-        if (data.success) {
-            statusDiv.className = 'result-message success';
-            let html = `✅ <strong>Connection Successful!</strong><br>`;
-            html += `Connected as: ${data.username || creds.username}<br>`;
-            if (data.instance_url) {
-                html += `Instance: ${data.instance_url}<br>`;
-            }
-            if (showSaveMessage) {
-                html += `<br>✓ Credentials saved locally in your browser`;
-            }
-            statusDiv.innerHTML = html;
-            
-            // Save credentials if connection successful
-            if (showSaveMessage) {
-                localStorage.setItem(SALESFORCE_KEY, JSON.stringify(creds));
-                document.getElementById('clearSalesforceBtn').style.display = 'inline-block';
-            }
+
+        if (data.success && data.authorize_url) {
+            window.location.href = data.authorize_url;
         } else {
             statusDiv.className = 'result-message error';
-            let html = `✗ <strong>Connection Failed</strong><br>`;
-            html += `${data.error || 'Unknown error'}<br>`;
-            if (data.details) {
-                html += `<small style="display: block; margin-top: 5px; color: var(--text-secondary);">${data.details}</small>`;
-            }
-            if (data.solution) {
-                html += `<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">`;
-                html += `<strong>💡 Solution:</strong> ${data.solution}`;
-                html += `</div>`;
-            }
-            if (data.debug && data.debug.error_type === 'missing_security_token') {
-                html += `<div style="margin-top: 10px; padding: 10px; background: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">`;
-                html += `<strong>📝 Next Steps:</strong><br>`;
-                html += `1. Go to Salesforce Setup → My Personal Information → Reset My Security Token<br>`;
-                html += `2. Check your email for the security token<br>`;
-                html += `3. Enter the token in the "Security Token" field above<br>`;
-                html += `4. Click "Test Connection" again`;
-                html += `</div>`;
-            }
-            if (data.troubleshooting && data.troubleshooting.length > 0) {
-                html += `<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">`;
-                html += `<strong>🔧 Troubleshooting Steps:</strong><ul style="margin: 5px 0 0 20px;">`;
-                data.troubleshooting.forEach(step => {
-                    html += `<li>${step}</li>`;
-                });
-                html += `</ul></div>`;
-            }
-            if (data.debug) {
-                html += `<details style="margin-top: 10px;"><summary style="cursor: pointer; color: var(--text-secondary);">Debug Info</summary><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 5px; font-size: 0.85rem;">${JSON.stringify(data.debug, null, 2)}</pre></details>`;
-            }
-            statusDiv.innerHTML = html;
+            statusDiv.innerHTML = `Connection failed: ${data.error || 'Unknown error'}`;
+            connectBtn.disabled = false;
+            connectBtn.textContent = 'Connect to Salesforce';
         }
     } catch (error) {
         statusDiv.className = 'result-message error';
-        statusDiv.innerHTML = `✗ <strong>Connection Error</strong><br>${error.message}`;
-    } finally {
-        testBtn.disabled = false;
-        testBtn.textContent = 'Test Connection';
+        statusDiv.innerHTML = `Error: ${error.message}`;
+        connectBtn.disabled = false;
+        connectBtn.textContent = 'Connect to Salesforce';
     }
-}
-
-document.getElementById('testSalesforceBtn').addEventListener('click', () => {
-    testSalesforceConnection();
 });
 
-document.getElementById('clearSalesforceBtn').addEventListener('click', clearSalesforceCredentials);
+// Handle Disconnect
+document.getElementById('sfDisconnectBtn').addEventListener('click', () => {
+    if (confirm('Disconnect from Salesforce?')) {
+        localStorage.removeItem(SF_SESSION_KEY);
+        updateSalesforceUI();
+    }
+});
 
 // Salesforce Query
 document.getElementById('salesforceQueryForm').addEventListener('submit', async (e) => {
@@ -810,10 +707,10 @@ document.getElementById('salesforceQueryForm').addEventListener('submit', async 
     const resultDiv = document.getElementById('salesforceQueryResult');
     
     const creds = getSalesforceCredentials();
-    if (!creds.username || !creds.password) {
+    if (!creds.access_token) {
         resultDiv.style.display = 'block';
         resultDiv.className = 'story-result error';
-        resultDiv.innerHTML = '✗ Please configure your Salesforce credentials first';
+        resultDiv.innerHTML = 'Please connect to Salesforce first';
         return;
     }
     
@@ -896,10 +793,10 @@ document.getElementById('salesforceCreateForm').addEventListener('submit', async
     const resultDiv = document.getElementById('salesforceCreateResult');
     
     const creds = getSalesforceCredentials();
-    if (!creds.username || !creds.password) {
+    if (!creds.access_token) {
         resultDiv.style.display = 'block';
         resultDiv.className = 'story-result error';
-        resultDiv.innerHTML = '✗ Please configure your Salesforce credentials first';
+        resultDiv.innerHTML = 'Please connect to Salesforce first';
         return;
     }
     
@@ -967,10 +864,10 @@ document.getElementById('salesforceUpdateForm').addEventListener('submit', async
     const resultDiv = document.getElementById('salesforceUpdateResult');
     
     const creds = getSalesforceCredentials();
-    if (!creds.username || !creds.password) {
+    if (!creds.access_token) {
         resultDiv.style.display = 'block';
         resultDiv.className = 'story-result error';
-        resultDiv.innerHTML = '✗ Please configure your Salesforce credentials first';
+        resultDiv.innerHTML = 'Please connect to Salesforce first';
         return;
     }
     
@@ -1039,10 +936,10 @@ document.getElementById('salesforceActionForm').addEventListener('submit', async
     const resultDiv = document.getElementById('salesforceActionResult');
     
     const creds = getSalesforceCredentials();
-    if (!creds.username || !creds.password) {
+    if (!creds.access_token) {
         resultDiv.style.display = 'block';
         resultDiv.className = 'story-result error';
-        resultDiv.innerHTML = '✗ Please configure your Salesforce credentials first';
+        resultDiv.innerHTML = 'Please connect to Salesforce first';
         return;
     }
     

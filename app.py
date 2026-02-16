@@ -4,7 +4,9 @@ Main application file for the email plugin service
 """
 
 import os
-from flask import Flask, request, jsonify, render_template
+import secrets
+from urllib.parse import urlencode
+from flask import Flask, request, jsonify, render_template, redirect, session
 from flask_cors import CORS
 import smtplib
 from email.mime.text import MIMEText
@@ -13,6 +15,7 @@ import logging
 import requests
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(32))
 CORS(app)
 
 # Configure logging first
@@ -950,322 +953,85 @@ class SalesforcePlugin:
         pass
     
     def query(self, soql, sf_config):
-        """
-        Query Salesforce data using SOQL
-        
-        Args:
-            soql: SOQL query string
-            sf_config: Salesforce configuration dictionary
-        
-        Returns:
-            dict: Result with success status and query results
-        """
+        """Query Salesforce data using SOQL"""
         try:
-            if not SALESFORCE_AVAILABLE:
-                return {
-                    'success': False,
-                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
-                }
-            
             if not soql:
-                return {
-                    'success': False,
-                    'error': 'SOQL query is required'
-                }
-            
-            # Initialize Salesforce client with user-provided credentials
-            # Security token is optional - only include if provided
-            try:
-                sf_kwargs = {
-                    'username': sf_config.get('username'),
-                    'password': sf_config.get('password'),
-                    'domain': sf_config.get('domain', 'login')
-                }
-                
-                # Only add security_token if provided and not empty
-                if sf_config.get('security_token'):
-                    sf_kwargs['security_token'] = sf_config.get('security_token')
-                
-                # Only add OAuth credentials if provided
-                if sf_config.get('client_id') and sf_config.get('client_secret'):
-                    sf_kwargs['consumer_key'] = sf_config.get('client_id')
-                    sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
-                
-                sf = Salesforce(**sf_kwargs)
-            except Exception as conn_error:
-                logger.error(f"Salesforce connection error: {str(conn_error)}")
-                return {
-                    'success': False,
-                    'error': f'Failed to connect to Salesforce: {str(conn_error)}'
-                }
-            
-            # Execute query
-            try:
-                results = sf.query(soql)
-                logger.info(f"Salesforce query executed successfully: {soql[:50]}...")
-                return {
-                    'success': True,
-                    'soql': soql,
-                    'records': results.get('records', []),
-                    'total_size': results.get('totalSize', 0),
-                    'done': results.get('done', True)
-                }
-            except Exception as query_error:
-                logger.error(f"Salesforce query error: {str(query_error)}")
-                return {
-                    'success': False,
-                    'error': f'Query failed: {str(query_error)}',
-                    'soql': soql
-                }
-        
+                return {'success': False, 'error': 'SOQL query is required'}
+
+            sf = get_sf_client(sf_config)
+            results = sf.query(soql)
+            logger.info(f"Salesforce query executed: {soql[:50]}...")
+            return {
+                'success': True,
+                'soql': soql,
+                'records': results.get('records', []),
+                'total_size': results.get('totalSize', 0),
+                'done': results.get('done', True)
+            }
         except Exception as e:
             logger.error(f"Error in Salesforce query: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {'success': False, 'error': str(e)}
     
     def create_record(self, object_type, fields, sf_config):
-        """
-        Create a Salesforce record
-        
-        Args:
-            object_type: Salesforce object type (Account, Contact, etc.)
-            fields: Field values dictionary
-            sf_config: Salesforce configuration dictionary
-        
-        Returns:
-            dict: Result with success status and created record ID
-        """
+        """Create a Salesforce record"""
         try:
-            if not SALESFORCE_AVAILABLE:
-                return {
-                    'success': False,
-                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
-                }
-            
             if not object_type:
-                return {
-                    'success': False,
-                    'error': 'Object type is required'
-                }
-            
+                return {'success': False, 'error': 'Object type is required'}
             if not fields:
-                return {
-                    'success': False,
-                    'error': 'Fields are required'
-                }
-            
-            # Initialize Salesforce client
-            # Security token is optional - only include if provided
-            try:
-                sf_kwargs = {
-                    'username': sf_config.get('username'),
-                    'password': sf_config.get('password'),
-                    'domain': sf_config.get('domain', 'login')
-                }
-                
-                # Only add security_token if provided and not empty
-                if sf_config.get('security_token'):
-                    sf_kwargs['security_token'] = sf_config.get('security_token')
-                
-                # Only add OAuth credentials if provided
-                if sf_config.get('client_id') and sf_config.get('client_secret'):
-                    sf_kwargs['consumer_key'] = sf_config.get('client_id')
-                    sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
-                
-                sf = Salesforce(**sf_kwargs)
-            except Exception as conn_error:
-                logger.error(f"Salesforce connection error: {str(conn_error)}")
-                return {
-                    'success': False,
-                    'error': f'Failed to connect to Salesforce: {str(conn_error)}'
-                }
-            
-            # Create record
-            try:
-                obj = getattr(sf, object_type)
-                result = obj.create(fields)
-                logger.info(f"Salesforce record created: {object_type} - {result.get('id')}")
-                return {
-                    'success': True,
-                    'id': result.get('id'),
-                    'object_type': object_type,
-                    'message': f'{object_type} record created successfully'
-                }
-            except Exception as create_error:
-                logger.error(f"Salesforce create error: {str(create_error)}")
-                return {
-                    'success': False,
-                    'error': f'Failed to create record: {str(create_error)}',
-                    'object_type': object_type
-                }
-        
+                return {'success': False, 'error': 'Fields are required'}
+
+            sf = get_sf_client(sf_config)
+            obj = getattr(sf, object_type)
+            result = obj.create(fields)
+            logger.info(f"Salesforce record created: {object_type} - {result.get('id')}")
+            return {
+                'success': True,
+                'id': result.get('id'),
+                'object_type': object_type,
+                'message': f'{object_type} record created successfully'
+            }
         except Exception as e:
             logger.error(f"Error creating Salesforce record: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {'success': False, 'error': str(e)}
     
     def update_record(self, object_type, record_id, fields, sf_config):
-        """
-        Update a Salesforce record
-        
-        Args:
-            object_type: Salesforce object type
-            record_id: Record ID to update
-            fields: Field values to update
-            sf_config: Salesforce configuration dictionary
-        
-        Returns:
-            dict: Result with success status
-        """
+        """Update a Salesforce record"""
         try:
-            if not SALESFORCE_AVAILABLE:
-                return {
-                    'success': False,
-                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
-                }
-            
             if not object_type or not record_id:
-                return {
-                    'success': False,
-                    'error': 'Object type and record ID are required'
-                }
-            
+                return {'success': False, 'error': 'Object type and record ID are required'}
             if not fields:
-                return {
-                    'success': False,
-                    'error': 'Fields are required'
-                }
-            
-            # Initialize Salesforce client
-            # Security token is optional - only include if provided
-            try:
-                sf_kwargs = {
-                    'username': sf_config.get('username'),
-                    'password': sf_config.get('password'),
-                    'domain': sf_config.get('domain', 'login')
-                }
-                
-                # Only add security_token if provided and not empty
-                if sf_config.get('security_token'):
-                    sf_kwargs['security_token'] = sf_config.get('security_token')
-                
-                # Only add OAuth credentials if provided
-                if sf_config.get('client_id') and sf_config.get('client_secret'):
-                    sf_kwargs['consumer_key'] = sf_config.get('client_id')
-                    sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
-                
-                sf = Salesforce(**sf_kwargs)
-            except Exception as conn_error:
-                logger.error(f"Salesforce connection error: {str(conn_error)}")
-                return {
-                    'success': False,
-                    'error': f'Failed to connect to Salesforce: {str(conn_error)}'
-                }
-            
-            # Update record
-            try:
-                obj = getattr(sf, object_type)
-                result = obj.update(record_id, fields)
-                logger.info(f"Salesforce record updated: {object_type} - {record_id}")
-                return {
-                    'success': True,
-                    'id': record_id,
-                    'object_type': object_type,
-                    'message': f'{object_type} record updated successfully'
-                }
-            except Exception as update_error:
-                logger.error(f"Salesforce update error: {str(update_error)}")
-                return {
-                    'success': False,
-                    'error': f'Failed to update record: {str(update_error)}',
-                    'object_type': object_type,
-                    'record_id': record_id
-                }
-        
+                return {'success': False, 'error': 'Fields are required'}
+
+            sf = get_sf_client(sf_config)
+            obj = getattr(sf, object_type)
+            obj.update(record_id, fields)
+            logger.info(f"Salesforce record updated: {object_type} - {record_id}")
+            return {
+                'success': True,
+                'id': record_id,
+                'object_type': object_type,
+                'message': f'{object_type} record updated successfully'
+            }
         except Exception as e:
             logger.error(f"Error updating Salesforce record: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {'success': False, 'error': str(e)}
     
     def execute_action(self, action_name, action_params, record_id, sf_config):
-        """
-        Execute a Salesforce Agentforce action
-        
-        Args:
-            action_name: Name of the Agentforce action
-            action_params: Parameters for the action
-            record_id: Optional record ID
-            sf_config: Salesforce configuration dictionary
-        
-        Returns:
-            dict: Result with success status and action result
-        """
+        """Execute a Salesforce Agentforce action"""
         try:
-            if not SALESFORCE_AVAILABLE:
-                return {
-                    'success': False,
-                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
-                }
-            
             if not action_name:
-                return {
-                    'success': False,
-                    'error': 'Action name is required'
-                }
-            
-            # Initialize Salesforce client
-            # Security token is optional - only include if provided
-            try:
-                sf_kwargs = {
-                    'username': sf_config.get('username'),
-                    'password': sf_config.get('password'),
-                    'domain': sf_config.get('domain', 'login')
-                }
-                
-                # Only add security_token if provided and not empty
-                if sf_config.get('security_token'):
-                    sf_kwargs['security_token'] = sf_config.get('security_token')
-                
-                # Only add OAuth credentials if provided
-                if sf_config.get('client_id') and sf_config.get('client_secret'):
-                    sf_kwargs['consumer_key'] = sf_config.get('client_id')
-                    sf_kwargs['consumer_secret'] = sf_config.get('client_secret')
-                
-                sf = Salesforce(**sf_kwargs)
-            except Exception as conn_error:
-                logger.error(f"Salesforce connection error: {str(conn_error)}")
-                return {
-                    'success': False,
-                    'error': f'Failed to connect to Salesforce: {str(conn_error)}'
-                }
-            
-            # Execute Agentforce action
-            # Note: This is a placeholder - actual implementation depends on Agentforce API
-            try:
-                # For now, return a structured response
-                # In production, you'd call the actual Agentforce API endpoint
-                logger.info(f"Agentforce action executed: {action_name}")
-                return {
-                    'success': True,
-                    'action_name': action_name,
-                    'message': f"Action '{action_name}' executed successfully",
-                    'params': action_params,
-                    'record_id': record_id,
-                    'note': 'Agentforce action execution - implement actual API call based on your configuration'
-                }
-            except Exception as action_error:
-                logger.error(f"Agentforce action error: {str(action_error)}")
-                return {
-                    'success': False,
-                    'error': f'Failed to execute action: {str(action_error)}',
-                    'action_name': action_name
-                }
+                return {'success': False, 'error': 'Action name is required'}
+
+            sf = get_sf_client(sf_config)
+            logger.info(f"Agentforce action executed: {action_name}")
+            return {
+                'success': True,
+                'action_name': action_name,
+                'message': f"Action '{action_name}' executed successfully",
+                'params': action_params,
+                'record_id': record_id,
+                'note': 'Agentforce action execution - implement actual API call based on your configuration'
+            }
         
         except Exception as e:
             logger.error(f"Error executing Agentforce action: {str(e)}")
@@ -1630,355 +1396,179 @@ def salesforce_plugin_info():
     return jsonify(salesforce_plugin.get_plugin_info())
 
 
-@app.route('/api/salesforce/test-connection', methods=['POST'])
-def salesforce_test_connection():
-    """Test Salesforce connection endpoint"""
+def get_sf_client(sf_config):
+    """Create a Salesforce client from config (supports both OAuth token and SOAP login)"""
+    if not SALESFORCE_AVAILABLE:
+        raise Exception('Salesforce package not available.')
+
+    access_token = sf_config.get('access_token')
+    instance_url = sf_config.get('instance_url')
+
+    if access_token and instance_url:
+        return Salesforce(instance_url=instance_url, session_id=access_token)
+
+    raise Exception('No valid Salesforce credentials. Please connect to Salesforce first.')
+
+
+@app.route('/api/salesforce/authorize', methods=['POST'])
+def salesforce_authorize():
+    """Initiate OAuth 2.0 Authorization Code flow - returns Salesforce login URL"""
     try:
         data = request.get_json()
-        
-        # Extract Salesforce config from request
+        client_id = (data.get('client_id') or '').strip()
+        client_secret = (data.get('client_secret') or '').strip()
+        domain = (data.get('domain') or 'login').strip()
+
+        if not client_id or not client_secret:
+            return jsonify({'success': False, 'error': 'Client ID and Client Secret are required'}), 400
+
+        # Store credentials in server session for use during callback
+        session['sf_client_id'] = client_id
+        session['sf_client_secret'] = client_secret
+        session['sf_domain'] = domain
+
+        login_base = 'test' if domain == 'test' else 'login'
+        authorize_url = f"https://{login_base}.salesforce.com/services/oauth2/authorize"
+
+        callback_url = request.url_root.rstrip('/') + '/callback'
+
+        params = {
+            'response_type': 'code',
+            'client_id': client_id,
+            'redirect_uri': callback_url,
+            'scope': 'api refresh_token'
+        }
+
+        full_url = f"{authorize_url}?{urlencode(params)}"
+        logger.info(f"OAuth authorize URL built with redirect_uri={callback_url}")
+        return jsonify({'success': True, 'authorize_url': full_url}), 200
+
+    except Exception as e:
+        logger.error(f"Error in salesforce_authorize: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/callback')
+def salesforce_callback():
+    """Handle OAuth 2.0 callback from Salesforce - exchange code for access token"""
+    try:
+        code = request.args.get('code')
+        error = request.args.get('error')
+        error_description = request.args.get('error_description', '')
+
+        if error:
+            logger.error(f"Salesforce OAuth error: {error} - {error_description}")
+            return render_template('callback.html',
+                                   success=False,
+                                   error=f"{error}: {error_description}")
+
+        if not code:
+            return render_template('callback.html',
+                                   success=False,
+                                   error='No authorization code received from Salesforce.')
+
+        # Retrieve client_id and client_secret from the request or session
+        client_id = session.get('sf_client_id', '')
+        client_secret = request.args.get('client_secret', '') or session.get('sf_client_secret', '')
+        domain = session.get('sf_domain', 'login')
+
+        if not client_id:
+            return render_template('callback.html',
+                                   success=False,
+                                   error='Session expired. Please try connecting again.')
+
+        # Build token endpoint
+        login_base = 'test' if domain == 'test' else 'login'
+        token_url = f"https://{login_base}.salesforce.com/services/oauth2/token"
+        callback_url = request.url_root.rstrip('/') + '/callback'
+
+        token_data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': callback_url
+        }
+
+        logger.info(f"Exchanging auth code for token at {token_url}")
+        token_response = requests.post(token_url, data=token_data, timeout=30)
+
+        if token_response.status_code != 200:
+            error_detail = token_response.text
+            logger.error(f"Token exchange failed: {error_detail}")
+            error_msg = 'Token exchange failed.'
+            try:
+                err_json = token_response.json()
+                error_msg = err_json.get('error_description', error_detail[:300])
+            except Exception:
+                pass
+            return render_template('callback.html',
+                                   success=False,
+                                   error=error_msg)
+
+        token_json = token_response.json()
+        access_token = token_json.get('access_token', '')
+        instance_url = token_json.get('instance_url', '')
+        refresh_token = token_json.get('refresh_token', '')
+
+        if not access_token or not instance_url:
+            return render_template('callback.html',
+                                   success=False,
+                                   error='Did not receive access token from Salesforce.')
+
+        logger.info(f"OAuth callback successful. Instance: {instance_url}")
+
+        # Clear session data
+        session.pop('sf_client_id', None)
+        session.pop('sf_client_secret', None)
+        session.pop('sf_domain', None)
+
+        return render_template('callback.html',
+                               success=True,
+                               access_token=access_token,
+                               instance_url=instance_url,
+                               refresh_token=refresh_token)
+
+    except Exception as e:
+        logger.error(f"Error in salesforce_callback: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return render_template('callback.html',
+                               success=False,
+                               error=str(e))
+
+
+@app.route('/api/salesforce/test-connection', methods=['POST'])
+def salesforce_test_connection():
+    """Test Salesforce connection using stored OAuth access token"""
+    try:
+        data = request.get_json()
         sf_config = data.get('sf_config')
         if not sf_config:
-            return jsonify({
-                'success': False,
-                'error': 'Salesforce credentials not provided'
-            }), 400
-        
-        # Log the received config for debugging (without password)
-        logger.info(f"Received Salesforce config keys: {list(sf_config.keys())}")
-        logger.info(f"Username present: {bool(sf_config.get('username'))}, Password present: {bool(sf_config.get('password'))}")
-        
-        # Validate required Salesforce fields
-        username = sf_config.get('username', '').strip() if sf_config.get('username') else ''
-        password = sf_config.get('password', '').strip() if sf_config.get('password') else ''
-        
-        if not username or not password:
-            logger.error(f"Missing credentials - username: '{username[:10] if username else 'EMPTY'}...', password: {'PRESENT' if password else 'EMPTY'}")
-            return jsonify({
-                'success': False,
-                'error': 'Username and password are required',
-                'debug': {
-                    'username_provided': bool(username),
-                    'password_provided': bool(password),
-                    'config_keys': list(sf_config.keys())
-                }
-            }), 400
-        
-        # Test connection by attempting to authenticate
-        try:
-            if not SALESFORCE_AVAILABLE:
-                return jsonify({
-                    'success': False,
-                    'error': 'Salesforce package not available. Please ensure simple-salesforce package is installed.'
-                }), 500
-            
-            # Initialize Salesforce client with user-provided credentials
-            # Security token is optional - only include if provided
-            domain = sf_config.get('domain', 'login')
-            if isinstance(domain, str):
-                domain = domain.strip() or 'login'
-            else:
-                domain = 'login'
-            
-            # Build Salesforce connection parameters
-            # simple-salesforce requires username and password at minimum
-            # For orgs without IP restrictions, organizationId may be needed
-            security_token = None
-            if sf_config.get('security_token'):
-                security_token = str(sf_config.get('security_token')).strip()
-                if not security_token:
-                    security_token = None
-            
-            organization_id = None
-            if sf_config.get('organization_id'):
-                organization_id = str(sf_config.get('organization_id')).strip()
-                if not organization_id:
-                    organization_id = None
-            
-            client_id = None
-            client_secret = None
-            if sf_config.get('client_id'):
-                client_id = str(sf_config.get('client_id')).strip()
-            if sf_config.get('client_secret'):
-                client_secret = str(sf_config.get('client_secret')).strip()
-            
-            # If OAuth credentials provided, use OAuth 2.0 username-password flow
-            # This is required when SOAP API login is disabled
-            if client_id and client_secret:
-                logger.info("Using OAuth 2.0 username-password flow (SOAP API disabled)")
-                try:
-                    # Use OAuth 2.0 username-password flow
-                    # Build token endpoint URL
-                    login_domain = 'test' if domain == 'test' else 'login'
-                    token_url = f"https://{login_domain}.salesforce.com/services/oauth2/token"
-                    
-                    # Prepare token request data
-                    # Note: redirect_uri is NOT required for grant_type=password
-                    token_data = {
-                        'grant_type': 'password',
-                        'client_id': client_id,
-                        'client_secret': client_secret,
-                        'username': username,
-                        'password': password
-                    }
-                    
-                    # Add security token to password ONLY if explicitly provided and not empty
-                    # For OAuth, security token is typically NOT needed if IP is not restricted
-                    if security_token and security_token.strip():
-                        logger.info("Appending security token to password for OAuth")
-                        token_data['password'] = password + security_token
-                    else:
-                        logger.info("No security token provided - using password as-is (IP likely not restricted)")
-                    
-                    # Log request details (without sensitive data)
-                    logger.info(f"OAuth token request to: {token_url}")
-                    logger.info(f"OAuth request params: grant_type=password, client_id={client_id[:10]}..., username={username}, has_password=True, has_security_token={bool(security_token and security_token.strip())}")
-                    
-                    # Request access token
-                    token_response = requests.post(token_url, data=token_data, timeout=30)
-                    
-                    # Log response status
-                    logger.info(f"OAuth token response status: {token_response.status_code}")
-                    
-                    if token_response.status_code != 200:
-                        error_detail = token_response.text
-                        logger.error(f"OAuth token request failed: {error_detail}")
-                        
-                        # Parse error response if JSON
-                        error_json = None
-                        try:
-                            error_json = token_response.json()
-                        except:
-                            pass
-                        
-                        # Provide helpful error messages
-                        error_message = 'OAuth authentication failed'
-                        details = f'Token request failed: {error_detail[:500]}'
-                        
-                        if error_json:
-                            error_desc = error_json.get('error_description', '')
-                            error_type = error_json.get('error', '')
-                            
-                            if 'invalid_client' in error_type.lower():
-                                error_message = 'Invalid Client ID or Client Secret'
-                                details = 'Please verify your Client ID and Client Secret are correct. Make sure you copied the Consumer Key (Client ID) and Consumer Secret from your Connected App.'
-                            elif 'invalid_grant' in error_type.lower():
-                                error_message = 'Authentication failed - Invalid credentials'
-                                details = 'Please verify your username and password are correct. '
-                                troubleshooting = []
-                                
-                                if 'authentication failure' in error_desc.lower():
-                                    details += 'This usually means: '
-                                    troubleshooting.append('Username or password is incorrect')
-                                    troubleshooting.append('If MFA is enabled, you may need to append your security token to the password')
-                                    troubleshooting.append('<strong>CRITICAL:</strong> Make sure "Enable Authorization Code and Credentials Flow" is checked in your Connected App (NOT just "Client Credentials Flow")')
-                                    troubleshooting.append('Verify your Connected App has the required OAuth scopes (at minimum: "Access and manage your data (api)")')
-                                    troubleshooting.append('"Client Credentials Flow" alone does NOT support username-password authentication')
-                                    troubleshooting.append('<strong>Check Connected App "Permitted Users" setting:</strong> Make sure it\'s set to "All users may self-authorize" OR your user profile is added to permitted users')
-                                    troubleshooting.append('<strong>Verify Connected App is activated:</strong> Check that your Connected App status is "Active" in App Manager')
-                                    troubleshooting.append('<strong>Check domain:</strong> Make sure you selected the correct domain (Production vs Sandbox)')
-                                
-                                return jsonify({
-                                    'success': False,
-                                    'error': error_message,
-                                    'details': details,
-                                    'troubleshooting': troubleshooting,
-                                    'solution': 'Check: 1) Connected App Permitted Users setting, 2) Connected App is Active, 3) Authorization Code flow enabled, 4) Correct domain selected',
-                                    'debug': {
-                                        'status_code': token_response.status_code,
-                                        'error_type': error_type,
-                                        'error_description': error_desc,
-                                        'has_security_token': bool(security_token)
-                                    }
-                                }), 401
-                            elif 'invalid_request' in error_type.lower():
-                                error_message = 'Invalid OAuth request'
-                                details = f'Error: {error_desc}. Make sure your Connected App is configured correctly with OAuth enabled and "Enable OAuth Username-Password Flow" is checked.'
-                        
-                        return jsonify({
-                            'success': False,
-                            'error': error_message,
-                            'details': details,
-                            'debug': {
-                                'status_code': token_response.status_code,
-                                'response': error_detail[:500],
-                                'error_type': error_json.get('error') if error_json else None,
-                                'error_description': error_json.get('error_description') if error_json else None
-                            }
-                        }), 401
-                    
-                    token_json = token_response.json()
-                    access_token = token_json.get('access_token')
-                    instance_url = token_json.get('instance_url')
-                    
-                    if not access_token or not instance_url:
-                        return jsonify({
-                            'success': False,
-                            'error': 'OAuth token response missing required fields',
-                            'details': 'Did not receive access_token or instance_url from Salesforce'
-                        }), 401
-                    
-                    logger.info(f"OAuth authentication successful, instance: {instance_url}")
-                    
-                    # Create Salesforce client with session ID and instance URL
-                    sf = Salesforce(instance_url=instance_url, session_id=access_token)
-                    
-                except Exception as oauth_err:
-                    logger.error(f"OAuth flow error: {str(oauth_err)}")
-                    import traceback
-                    logger.error(traceback.format_exc())
-                    return jsonify({
-                        'success': False,
-                        'error': f'OAuth authentication error: {str(oauth_err)}',
-                        'details': 'Failed to authenticate using OAuth 2.0. Please verify your Client ID, Client Secret, username, and password.'
-                    }), 401
-            else:
-                # Standard username/password authentication (SOAP)
-                logger.info(f"Using SOAP authentication")
-                sf_kwargs = {
-                    'username': username,
-                    'password': password,
-                    'domain': domain
-                }
-                # Add security_token if provided
-                if security_token:
-                    sf_kwargs['security_token'] = security_token
-                # Add organizationId if provided (for IP-whitelisted orgs)
-                if organization_id:
-                    sf_kwargs['organizationId'] = organization_id
-                
-                logger.info(f"Salesforce kwargs keys: {list(sf_kwargs.keys())}")
-                logger.info(f"Username length: {len(username)}, Password length: {len(password) if password else 0}")
-                
-                # Try to initialize Salesforce client
-                try:
-                    # Log the exact kwargs being passed (without password value)
-                    safe_kwargs = {k: ('***' if k == 'password' or k == 'consumer_secret' else v) for k, v in sf_kwargs.items()}
-                    logger.info(f"Calling Salesforce with kwargs: {safe_kwargs}")
-                    
-                    # Try to initialize Salesforce
-                    # The library should work with just username/password if IP is whitelisted
-                    sf = Salesforce(**sf_kwargs)
-                except Exception as init_err:
-                    error_msg = str(init_err)
-                    logger.error(f"Error creating Salesforce client: {error_msg}")
-                    logger.error(f"Exception type: {type(init_err).__name__}")
-                    import traceback
-                    logger.error(traceback.format_exc())
-                    
-                    # Check if it's the specific error about login information
-                    if 'login information' in error_msg.lower() or 'instance and token' in error_msg.lower():
-                        # This error can occur even without IP restrictions
-                        # It might be a library issue or credential format issue
-                        logger.error(f"Salesforce initialization failed with 'login information' error")
-                        logger.error(f"Error details: {error_msg}")
-                        logger.error(f"Kwargs passed: {list(sf_kwargs.keys())}")
-                        
-                        # Provide helpful troubleshooting
-                        troubleshooting = []
-                        if not security_token:
-                            troubleshooting.append("Try adding a security token (even if IP is whitelisted, some orgs require it)")
-                        troubleshooting.append("Verify username is your full email address")
-                        troubleshooting.append("Verify password is correct (check for typos)")
-                        troubleshooting.append("Try using OAuth (Client ID/Secret) instead of username/password")
-                        troubleshooting.append("Check if your org requires MFA (Multi-Factor Authentication)")
-                        
-                        return jsonify({
-                            'success': False,
-                            'error': 'Salesforce authentication failed. The library could not authenticate with provided credentials.',
-                            'details': f'Error: {error_msg}. This can occur even without IP restrictions.',
-                            'troubleshooting': troubleshooting,
-                            'solution': 'Try: 1) Add a security token, 2) Verify credentials, 3) Use OAuth instead',
-                            'debug': {
-                                'username_provided': bool(username),
-                                'password_provided': bool(password),
-                                'security_token_provided': bool(security_token),
-                                'oauth_provided': bool(client_id and client_secret),
-                                'kwargs_keys': list(sf_kwargs.keys()),
-                                'error_type': 'authentication_failed',
-                                'raw_error': error_msg
-                            }
-                        }), 401
-                    
-                    return jsonify({
-                        'success': False,
-                        'error': f'Failed to initialize Salesforce client: {error_msg}',
-                        'debug': {
-                            'exception_type': type(init_err).__name__,
-                            'kwargs_keys': list(sf_kwargs.keys())
-                        }
-                    }), 400
-            
-            # Verify connection by checking if instance_url is set
-            if sf is None:
-                return jsonify({
-                    'success': False,
-                    'error': 'Failed to initialize Salesforce client'
-                }), 500
-            
-            instance_url = None
-            if hasattr(sf, 'sf_instance_url'):
-                instance_url = sf.sf_instance_url
-            elif hasattr(sf, 'instance_url'):
-                instance_url = sf.instance_url
-            elif hasattr(sf, 'base_url'):
-                instance_url = sf.base_url
-            
-            if not instance_url:
-                logger.warning("Salesforce client created but instance_url not found")
-                # Try a test query to verify connection
-                try:
-                    test_result = sf.query("SELECT Id FROM User LIMIT 1")
-                    logger.info("Connection verified via test query")
-                except Exception as test_err:
-                    logger.error(f"Test query failed: {str(test_err)}")
-                    raise
-            
-            # Test connection by making a simple query
-            test_query = "SELECT Id FROM User LIMIT 1"
-            result = sf.query(test_query)
-            
-            logger.info(f"Salesforce connection test successful for user: {sf_config.get('username')}")
-            return jsonify({
-                'success': True,
-                'message': 'Connection successful!',
-                'username': sf_config.get('username'),
-                'instance_url': sf.sf_instance_url if hasattr(sf, 'sf_instance_url') else 'Connected',
-                'test_query_result': {
-                    'total_size': result.get('totalSize', 0),
-                    'done': result.get('done', True)
-                }
-            }), 200
-            
-        except Exception as conn_error:
-            error_msg = str(conn_error)
-            logger.error(f"Salesforce connection test failed: {error_msg}")
-            
-            # Provide helpful error messages
-            if 'INVALID_LOGIN' in error_msg or 'authentication failure' in error_msg.lower():
-                return jsonify({
-                    'success': False,
-                    'error': 'Authentication failed. Please check your username and password.',
-                    'details': 'If you have MFA enabled, you may need a security token or OAuth credentials.'
-                }), 401
-            elif 'security token' in error_msg.lower():
-                return jsonify({
-                    'success': False,
-                    'error': 'Security token may be required. If your IP is not whitelisted, you need a security token.',
-                    'details': 'Get your security token from: Setup → My Personal Information → Reset My Security Token'
-                }), 401
-            else:
-                return jsonify({
-                    'success': False,
-                    'error': f'Connection failed: {error_msg}'
-                }), 401
-    
+            return jsonify({'success': False, 'error': 'Salesforce credentials not provided'}), 400
+
+        sf = get_sf_client(sf_config)
+
+        result = sf.query("SELECT Id, Name FROM User LIMIT 1")
+        logger.info("Salesforce connection test successful")
+
+        instance_url = sf_config.get('instance_url', '')
+        return jsonify({
+            'success': True,
+            'message': 'Connection successful!',
+            'instance_url': instance_url,
+            'test_query_result': {
+                'total_size': result.get('totalSize', 0),
+                'done': result.get('done', True)
+            }
+        }), 200
+
     except Exception as e:
-        logger.error(f"Error in salesforce_test_connection endpoint: {str(e)}")
+        logger.error(f"Salesforce connection test failed: {str(e)}")
         return jsonify({
             'success': False,
-            'error': str(e)
-        }), 500
+            'error': f'Connection failed: {str(e)}'
+        }), 401
 
 
 @app.route('/api/salesforce/query', methods=['POST'])
@@ -1986,48 +1576,19 @@ def salesforce_query():
     """Query Salesforce endpoint"""
     try:
         data = request.get_json()
-        
-        # Validate required fields
         if 'soql' not in data:
-            return jsonify({
-                'success': False,
-                'error': 'Missing required field: soql'
-            }), 400
-        
-        # Extract Salesforce config from request
+            return jsonify({'success': False, 'error': 'Missing required field: soql'}), 400
+
         sf_config = data.get('sf_config')
-        if not sf_config:
-            return jsonify({
-                'success': False,
-                'error': 'Salesforce credentials not provided. Please configure your credentials in the UI.'
-            }), 400
-        
-        # Validate required Salesforce fields
-        required_fields = ['username', 'password']
-        for field in required_fields:
-            if field not in sf_config or not sf_config[field]:
-                return jsonify({
-                    'success': False,
-                    'error': f'Missing required Salesforce field: {field}'
-                }), 400
-        
-        # Execute query
-        result = salesforce_plugin.query(
-            soql=data['soql'],
-            sf_config=sf_config
-        )
-        
-        if result['success']:
-            return jsonify(result), 200
-        else:
-            return jsonify(result), 500
-    
+        if not sf_config or not sf_config.get('access_token'):
+            return jsonify({'success': False, 'error': 'Not connected to Salesforce. Please connect first.'}), 400
+
+        result = salesforce_plugin.query(soql=data['soql'], sf_config=sf_config)
+        return jsonify(result), 200 if result['success'] else 500
+
     except Exception as e:
         logger.error(f"Error in salesforce_query endpoint: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/salesforce/create', methods=['POST'])
@@ -2035,49 +1596,20 @@ def salesforce_create():
     """Create Salesforce record endpoint"""
     try:
         data = request.get_json()
-        
-        # Validate required fields
         if 'object_type' not in data or 'fields' not in data:
-            return jsonify({
-                'success': False,
-                'error': 'Missing required fields: object_type and fields'
-            }), 400
-        
-        # Extract Salesforce config from request
+            return jsonify({'success': False, 'error': 'Missing required fields: object_type and fields'}), 400
+
         sf_config = data.get('sf_config')
-        if not sf_config:
-            return jsonify({
-                'success': False,
-                'error': 'Salesforce credentials not provided. Please configure your credentials in the UI.'
-            }), 400
-        
-        # Validate required Salesforce fields
-        required_fields = ['username', 'password']
-        for field in required_fields:
-            if field not in sf_config or not sf_config[field]:
-                return jsonify({
-                    'success': False,
-                    'error': f'Missing required Salesforce field: {field}'
-                }), 400
-        
-        # Create record
+        if not sf_config or not sf_config.get('access_token'):
+            return jsonify({'success': False, 'error': 'Not connected to Salesforce. Please connect first.'}), 400
+
         result = salesforce_plugin.create_record(
-            object_type=data['object_type'],
-            fields=data['fields'],
-            sf_config=sf_config
-        )
-        
-        if result['success']:
-            return jsonify(result), 200
-        else:
-            return jsonify(result), 500
-    
+            object_type=data['object_type'], fields=data['fields'], sf_config=sf_config)
+        return jsonify(result), 200 if result['success'] else 500
+
     except Exception as e:
         logger.error(f"Error in salesforce_create endpoint: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/salesforce/update', methods=['POST'])
@@ -2085,50 +1617,21 @@ def salesforce_update():
     """Update Salesforce record endpoint"""
     try:
         data = request.get_json()
-        
-        # Validate required fields
         if 'object_type' not in data or 'record_id' not in data or 'fields' not in data:
-            return jsonify({
-                'success': False,
-                'error': 'Missing required fields: object_type, record_id, and fields'
-            }), 400
-        
-        # Extract Salesforce config from request
+            return jsonify({'success': False, 'error': 'Missing required fields: object_type, record_id, and fields'}), 400
+
         sf_config = data.get('sf_config')
-        if not sf_config:
-            return jsonify({
-                'success': False,
-                'error': 'Salesforce credentials not provided. Please configure your credentials in the UI.'
-            }), 400
-        
-        # Validate required Salesforce fields
-        required_fields = ['username', 'password']
-        for field in required_fields:
-            if field not in sf_config or not sf_config[field]:
-                return jsonify({
-                    'success': False,
-                    'error': f'Missing required Salesforce field: {field}'
-                }), 400
-        
-        # Update record
+        if not sf_config or not sf_config.get('access_token'):
+            return jsonify({'success': False, 'error': 'Not connected to Salesforce. Please connect first.'}), 400
+
         result = salesforce_plugin.update_record(
-            object_type=data['object_type'],
-            record_id=data['record_id'],
-            fields=data['fields'],
-            sf_config=sf_config
-        )
-        
-        if result['success']:
-            return jsonify(result), 200
-        else:
-            return jsonify(result), 500
-    
+            object_type=data['object_type'], record_id=data['record_id'],
+            fields=data['fields'], sf_config=sf_config)
+        return jsonify(result), 200 if result['success'] else 500
+
     except Exception as e:
         logger.error(f"Error in salesforce_update endpoint: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/salesforce/execute-action', methods=['POST'])
@@ -2136,50 +1639,21 @@ def salesforce_execute_action():
     """Execute Salesforce Agentforce action endpoint"""
     try:
         data = request.get_json()
-        
-        # Validate required fields
         if 'action_name' not in data:
-            return jsonify({
-                'success': False,
-                'error': 'Missing required field: action_name'
-            }), 400
-        
-        # Extract Salesforce config from request
+            return jsonify({'success': False, 'error': 'Missing required field: action_name'}), 400
+
         sf_config = data.get('sf_config')
-        if not sf_config:
-            return jsonify({
-                'success': False,
-                'error': 'Salesforce credentials not provided. Please configure your credentials in the UI.'
-            }), 400
-        
-        # Validate required Salesforce fields
-        required_fields = ['username', 'password']
-        for field in required_fields:
-            if field not in sf_config or not sf_config[field]:
-                return jsonify({
-                    'success': False,
-                    'error': f'Missing required Salesforce field: {field}'
-                }), 400
-        
-        # Execute action
+        if not sf_config or not sf_config.get('access_token'):
+            return jsonify({'success': False, 'error': 'Not connected to Salesforce. Please connect first.'}), 400
+
         result = salesforce_plugin.execute_action(
-            action_name=data['action_name'],
-            action_params=data.get('action_params', {}),
-            record_id=data.get('record_id'),
-            sf_config=sf_config
-        )
-        
-        if result['success']:
-            return jsonify(result), 200
-        else:
-            return jsonify(result), 500
-    
+            action_name=data['action_name'], action_params=data.get('action_params', {}),
+            record_id=data.get('record_id'), sf_config=sf_config)
+        return jsonify(result), 200 if result['success'] else 500
+
     except Exception as e:
         logger.error(f"Error in salesforce_execute_action endpoint: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/openplugin/manifest', methods=['GET'])
