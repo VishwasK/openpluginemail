@@ -193,15 +193,27 @@
                             >
                         </div>
                         <div class="form-group">
-                            <label for="sfSecurityToken">Security Token <span style="color: var(--text-secondary); font-weight: normal;">(Required if IP not whitelisted)</span></label>
+                            <label for="sfSecurityToken">Security Token <span style="color: var(--text-secondary); font-weight: normal;">(Optional)</span></label>
                             <input 
                                 type="password" 
                                 id="sfSecurityToken" 
                                 name="sfSecurityToken" 
-                                placeholder="Security token - get from Salesforce Setup"
+                                placeholder="Security token (optional)"
                             >
                             <small class="help-text">
-                                <strong>Required if your IP is not whitelisted.</strong> Get your security token from: Setup → My Personal Information → Reset My Security Token. The token will be emailed to you. If you get a "login information" error, you need to add this token.
+                                Optional. Get from: Setup → My Personal Information → Reset My Security Token. Some orgs require this even without IP restrictions.
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label for="sfOrganizationId">Organization ID <span style="color: var(--text-secondary); font-weight: normal;">(Optional - for IP-whitelisted orgs)</span></label>
+                            <input 
+                                type="text" 
+                                id="sfOrganizationId" 
+                                name="sfOrganizationId" 
+                                placeholder="00Dxxxxxxxxxxxxxxx"
+                            >
+                            <small class="help-text">
+                                Optional. For orgs without IP restrictions, you may need your Organization ID. Find it in: Setup → Company Information → Organization ID (starts with 00D)
                             </small>
                         </div>
                         <div class="form-row">

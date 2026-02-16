@@ -1681,12 +1681,18 @@ def salesforce_test_connection():
             
             # Build Salesforce connection parameters
             # simple-salesforce requires username and password at minimum
-            # If OAuth credentials are provided, use those; otherwise use username/password
+            # For orgs without IP restrictions, organizationId may be needed
             security_token = None
             if sf_config.get('security_token'):
                 security_token = str(sf_config.get('security_token')).strip()
                 if not security_token:
                     security_token = None
+            
+            organization_id = None
+            if sf_config.get('organization_id'):
+                organization_id = str(sf_config.get('organization_id')).strip()
+                if not organization_id:
+                    organization_id = None
             
             client_id = None
             client_secret = None
@@ -1708,16 +1714,17 @@ def salesforce_test_connection():
                     sf_kwargs['security_token'] = security_token
             else:
                 # Standard username/password authentication
-                # Note: security_token is optional if IP is whitelisted
                 sf_kwargs = {
                     'username': username,
                     'password': password,
                     'domain': domain
                 }
-                # Only add security_token if explicitly provided
-                # Some orgs require it even without IP restrictions
+                # Add security_token if provided
                 if security_token:
                     sf_kwargs['security_token'] = security_token
+                # Add organizationId if provided (for IP-whitelisted orgs)
+                if organization_id:
+                    sf_kwargs['organizationId'] = organization_id
             
             logger.info(f"Attempting Salesforce connection with username: {username}, domain: {domain}, has_token: {bool(security_token)}, has_oauth: {bool(client_id and client_secret)}")
             logger.info(f"Salesforce kwargs keys: {list(sf_kwargs.keys())}")

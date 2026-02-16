@@ -575,6 +575,7 @@ function loadSalesforceCredentials() {
             document.getElementById('sfUsername').value = creds.username || '';
             document.getElementById('sfPassword').value = creds.password || '';
             document.getElementById('sfSecurityToken').value = creds.security_token || '';
+            document.getElementById('sfOrganizationId').value = creds.organization_id || '';
             document.getElementById('sfClientId').value = creds.client_id || '';
             document.getElementById('sfClientSecret').value = creds.client_secret || '';
             document.getElementById('sfDomain').value = creds.domain || 'login';
@@ -589,6 +590,7 @@ function saveSalesforceCredentials() {
     const username = document.getElementById('sfUsername').value.trim();
     const password = document.getElementById('sfPassword').value;
     const securityToken = document.getElementById('sfSecurityToken').value.trim();
+    const organizationId = document.getElementById('sfOrganizationId').value.trim();
     const clientId = document.getElementById('sfClientId').value.trim();
     const clientSecret = document.getElementById('sfClientSecret').value;
     const domain = document.getElementById('sfDomain').value || 'login';
@@ -597,6 +599,7 @@ function saveSalesforceCredentials() {
         username: username,
         password: password,
         security_token: securityToken || null,
+        organization_id: organizationId || null,
         client_id: clientId || null,
         client_secret: clientSecret || null,
         domain: domain
@@ -604,6 +607,7 @@ function saveSalesforceCredentials() {
     
     // Remove null/empty values to avoid sending empty strings
     if (!credentials.security_token) delete credentials.security_token;
+    if (!credentials.organization_id) delete credentials.organization_id;
     if (!credentials.client_id) delete credentials.client_id;
     if (!credentials.client_secret) delete credentials.client_secret;
     
@@ -621,6 +625,7 @@ function getSalesforceCredentials() {
         const creds = JSON.parse(saved);
         // Ensure we don't send empty strings
         if (creds.security_token === '') delete creds.security_token;
+        if (creds.organization_id === '') delete creds.organization_id;
         if (creds.client_id === '') delete creds.client_id;
         if (creds.client_secret === '') delete creds.client_secret;
         return creds;
@@ -630,6 +635,7 @@ function getSalesforceCredentials() {
     const username = document.getElementById('sfUsername').value.trim();
     const password = document.getElementById('sfPassword').value;
     const securityToken = document.getElementById('sfSecurityToken').value.trim();
+    const organizationId = document.getElementById('sfOrganizationId').value.trim();
     const clientId = document.getElementById('sfClientId').value.trim();
     const clientSecret = document.getElementById('sfClientSecret').value;
     const domain = document.getElementById('sfDomain').value || 'login';
@@ -641,6 +647,7 @@ function getSalesforceCredentials() {
     };
     
     if (securityToken) creds.security_token = securityToken;
+    if (organizationId) creds.organization_id = organizationId;
     if (clientId) creds.client_id = clientId;
     if (clientSecret) creds.client_secret = clientSecret;
     
