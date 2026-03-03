@@ -459,6 +459,27 @@
                 </div>
 
                 <div class="card">
+                    <h2>Import from SkillsMP</h2>
+                    <form id="searchSkillsMPForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="skillsmpQuery">Search Query</label>
+                                <input type="text" id="skillsmpQuery" placeholder="e.g., data analysis, AI">
+                            </div>
+                            <div class="form-group">
+                                <label for="skillsmpCategory">Category</label>
+                                <input type="text" id="skillsmpCategory" placeholder="data-ai, automation, etc.">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="searchSkillsMPBtn">
+                            <span class="btn-text">Search SkillsMP</span>
+                            <span class="btn-loader" style="display:none;">Searching...</span>
+                        </button>
+                    </form>
+                    <div id="skillsmpResults" style="margin-top:16px;display:none;"></div>
+                </div>
+
+                <div class="card">
                     <h2>Import Plugin</h2>
                     <form id="importPluginForm">
                         <div class="form-group">

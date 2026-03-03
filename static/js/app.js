@@ -1199,6 +1199,103 @@ function prepareSkillExecution(pluginName, skillName) {
     execCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// SkillsMP search handler
+document.getElementById('searchSkillsMPForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('searchSkillsMPBtn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoader = btn.querySelector('.btn-loader');
+    const resultsDiv = document.getElementById('skillsmpResults');
+    const query = document.getElementById('skillsmpQuery').value.trim();
+    const category = document.getElementById('skillsmpCategory').value.trim();
+    
+    if (!query && !category) {
+        resultsDiv.style.display = 'block';
+        resultsDiv.className = 'result-message error';
+        resultsDiv.innerHTML = 'Please provide either a search query or category';
+        return;
+    }
+    
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultsDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/skillsmp/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, category, limit: 20 })
+        });
+        
+        const data = await response.json();
+        resultsDiv.style.display = 'block';
+        
+        if (data.success && data.skills && data.skills.length > 0) {
+            resultsDiv.className = 'result-message success';
+            resultsDiv.innerHTML = `
+                <h3 style="margin-top:0;">Found ${data.total || data.skills.length} skills</h3>
+                <div style="display:grid;gap:12px;margin-top:12px;">
+                    ${data.skills.map(skill => `
+                        <div style="padding:16px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border);">
+                            <h4 style="margin:0 0 8px;">${skill.name || skill.title || 'Unnamed Skill'}</h4>
+                            <p style="color:var(--text-dim);margin:0 0 12px;font-size:.85rem;">${skill.description || skill.summary || 'No description'}</p>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                ${skill.category ? `<span style="padding:4px 8px;background:rgba(99,102,241,.15);border-radius:4px;font-size:.8rem;">${skill.category}</span>` : ''}
+                                ${skill.stars ? `<span style="padding:4px 8px;background:rgba(245,158,11,.15);border-radius:4px;font-size:.8rem;">⭐ ${skill.stars}</span>` : ''}
+                            </div>
+                            <button onclick="importSkillsMPSkill('${skill.id || skill.slug}', '${(skill.name || skill.title || '').replace(/'/g, "\\'")}')" class="btn btn-primary" style="margin-top:12px;width:auto;">Import Skill</button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            resultsDiv.className = 'result-message error';
+            resultsDiv.innerHTML = `No skills found. ${data.error || ''}`;
+        }
+    } catch (error) {
+        resultsDiv.style.display = 'block';
+        resultsDiv.className = 'result-message error';
+        resultsDiv.innerHTML = `Network error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Import SkillsMP skill
+async function importSkillsMPSkill(skillId, skillName) {
+    const resultDiv = document.getElementById('importPluginResult');
+    if (!resultDiv) return;
+    
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'result-message';
+    resultDiv.textContent = `Importing "${skillName}"...`;
+    
+    try {
+        const response = await fetch('/api/skillsmp/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skill_id: skillId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            resultDiv.className = 'result-message success';
+            resultDiv.textContent = data.message || `Skill "${skillName}" imported successfully`;
+            loadPlugins();
+        } else {
+            resultDiv.className = 'result-message error';
+            resultDiv.textContent = `Error: ${data.error || 'Failed to import skill'}`;
+        }
+    } catch (error) {
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = `Network error: ${error.message}`;
+    }
+}
+
 // Import plugin handler
 document.getElementById('importPluginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
