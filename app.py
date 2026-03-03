@@ -2022,9 +2022,6 @@ def search_skillsmp():
 @app.route('/api/skills/import', methods=['POST'])
 def import_skill():
     """Import a skill from GitHub URL (raw SKILL.md or repo) or SkillsMP"""
-    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
-        return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
-    
     try:
         data = request.get_json() or {}
         github_url = data.get('github_url')
@@ -2032,16 +2029,23 @@ def import_skill():
         skill_url = data.get('skill_url')  # For SkillsMP
         api_key = data.get('api_key') or os.getenv('SKILLSMP_API_KEY')
         
-        # If GitHub URL provided, import from GitHub
+        # If GitHub URL provided, import from GitHub (works without framework)
         if github_url:
             return import_skill_from_github(github_url)
         
-        # Otherwise, try SkillsMP import
+        # Otherwise, try SkillsMP import (requires framework)
         if not skill_id and not skill_url:
             return jsonify({
                 'success': False,
                 'error': 'Either "github_url", "skill_id", or "skill_url" must be provided'
             }), 400
+        
+        # SkillsMP import requires OpenPlugin framework
+        if not OPENPLUGIN_AVAILABLE or not plugin_manager:
+            return jsonify({
+                'success': False,
+                'error': 'OpenPlugin framework required for SkillsMP imports. Use GitHub import instead (no framework needed).'
+            }), 503
         
         return import_skill_from_skillsmp(skill_id, skill_url, api_key)
             
@@ -2190,11 +2194,18 @@ def import_skill_from_github(github_url):
 
 
 def import_skill_from_skillsmp(skill_id, skill_url, api_key):
-    """Import a skill from SkillsMP"""
+    """Import a skill from SkillsMP (requires OpenPlugin framework)"""
+    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
+        return jsonify({
+            'success': False,
+            'error': 'OpenPlugin framework required for SkillsMP imports'
+        }), 503
+    
     import tempfile
     import shutil
     import zipfile
     import json as json_lib
+    import re
     
     # Create temporary directory for the skill
     temp_dir = tempfile.mkdtemp()
@@ -2258,7 +2269,6 @@ def import_skill_from_skillsmp(skill_id, skill_url, api_key):
         skill_name = 'imported-skill'
         skill_description = 'Imported from SkillsMP'
         if skill_content.startswith('---'):
-            import re
             frontmatter_match = re.match(r'---\n(.*?)\n---\n(.*)', skill_content, re.DOTALL)
             if frontmatter_match:
                 frontmatter = frontmatter_match.group(1)
@@ -2274,16 +2284,19 @@ def import_skill_from_skillsmp(skill_id, skill_url, api_key):
                         elif key.lower() == 'description':
                             skill_description = value
         
-        # Create OpenPlugin-compatible plugin structure
-        plugin_dir = Path(os.getenv('PLUGINS_DIR', './plugins')) / f'skillsmp-{skill_name.lower().replace(" ", "-")}'
+        # Save as standalone skill first (works without framework)
+        safe_name = skill_name.lower().replace(' ', '-').replace('/', '-')
+        save_standalone_skill(safe_name, skill_content)
+        
+        # Also create OpenPlugin structure if framework is available
+        plugin_dir = Path(os.getenv('PLUGINS_DIR', './plugins')) / f'skillsmp-{safe_name}'
         plugin_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create .claude-plugin directory and manifest
         claude_plugin_dir = plugin_dir / '.claude-plugin'
         claude_plugin_dir.mkdir(exist_ok=True)
         
         manifest = {
-            'name': f'skillsmp-{skill_name.lower().replace(" ", "-")}',
+            'name': f'skillsmp-{safe_name}',
             'version': '1.0.0',
             'description': skill_description,
             'author': 'SkillsMP',
@@ -2293,8 +2306,7 @@ def import_skill_from_skillsmp(skill_id, skill_url, api_key):
         with open(claude_plugin_dir / 'plugin.json', 'w') as f:
             json_lib.dump(manifest, f, indent=2)
         
-        # Create skills directory and add skill
-        skills_dir = plugin_dir / 'skills' / skill_name.lower().replace(' ', '-')
+        skills_dir = plugin_dir / 'skills' / safe_name
         skills_dir.mkdir(parents=True, exist_ok=True)
         
         with open(skills_dir / 'SKILL.md', 'w', encoding='utf-8') as f:
@@ -2306,7 +2318,7 @@ def import_skill_from_skillsmp(skill_id, skill_url, api_key):
         return jsonify({
             'success': True,
             'plugin': plugin.name,
-            'skill': skill_name,
+            'skill': safe_name,
             'message': f'Skill "{skill_name}" imported successfully from SkillsMP'
         }), 200
         
