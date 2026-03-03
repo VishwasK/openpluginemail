@@ -1202,12 +1202,19 @@ function prepareSkillExecution(pluginName, skillName) {
     const execCard = document.getElementById('executeSkillCard');
     const execPlugin = document.getElementById('execPlugin');
     const execSkill = document.getElementById('execSkill');
+    const skillModel = document.getElementById('skillModel');
     
     if (!execCard || !execPlugin || !execSkill) return;
     
     execPlugin.value = pluginName;
     execSkill.value = skillName;
     execCard.style.display = 'block';
+    
+    // Trigger model change to set temperature correctly
+    if (skillModel) {
+        skillModel.dispatchEvent(new Event('change'));
+    }
+    
     execCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -1463,6 +1470,27 @@ document.getElementById('importPluginForm')?.addEventListener('submit', async (e
     }
 });
 
+// Handle model change to show/hide temperature control
+document.getElementById('skillModel')?.addEventListener('change', (e) => {
+    const model = e.target.value;
+    const tempInput = document.getElementById('skillTemperature');
+    const tempHelp = document.getElementById('skillTempHelp');
+    
+    if (!tempInput || !tempHelp) return;
+    
+    // Models that only support default temperature (1.0)
+    if (model.startsWith('gpt-5') || model.startsWith('o1') || model.startsWith('o3')) {
+        tempInput.disabled = true;
+        tempInput.value = '1';
+        tempHelp.style.display = 'block';
+        tempHelp.textContent = `${model} only supports default temperature (1.0)`;
+    } else {
+        tempInput.disabled = false;
+        tempInput.value = '0.7';
+        tempHelp.style.display = 'none';
+    }
+});
+
 // Execute skill handler
 document.getElementById('executeSkillForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1474,6 +1502,7 @@ document.getElementById('executeSkillForm')?.addEventListener('submit', async (e
     const skillName = document.getElementById('execSkill').value;
     const userInput = document.getElementById('skillUserInput').value;
     const model = document.getElementById('skillModel').value;
+    const temperature = document.getElementById('skillTemperature')?.value;
     
     const creds = getOpenAICredentials();
     if (!creds.apiKey) {
@@ -1489,14 +1518,21 @@ document.getElementById('executeSkillForm')?.addEventListener('submit', async (e
     resultDiv.style.display = 'none';
     
     try {
+        const payload = {
+            openai_api_key: creds.apiKey,
+            user_input: userInput,
+            model: model
+        };
+        
+        // Only include temperature if model supports it
+        if (temperature && !model.startsWith('gpt-5') && !model.startsWith('o1') && !model.startsWith('o3')) {
+            payload.temperature = parseFloat(temperature);
+        }
+        
         const response = await fetch(`/api/plugins/${pluginName}/skills/${skillName}/execute`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                openai_api_key: creds.apiKey,
-                user_input: userInput,
-                model: model
-            })
+            body: JSON.stringify(payload)
         });
         
         const data = await response.json();

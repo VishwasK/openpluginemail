@@ -1934,13 +1934,19 @@ def execute_skill(plugin_name, skill_name):
         system_prompt = "You are a helpful assistant executing a skill. Follow the instructions in the skill definition carefully."
         user_prompt = f"{skill_content}\n\nUser Input: {user_input}"
         
-        # Determine which parameter to use based on model
+        # Determine which parameters to use based on model
         # Newer models (gpt-5-nano, o1, o3, etc.) use max_completion_tokens instead of max_tokens
+        # Some models (gpt-5-nano, o1, o3) only support default temperature (1.0)
         completion_params = {}
         if model.startswith('gpt-5') or model.startswith('o1') or model.startswith('o3'):
             completion_params['max_completion_tokens'] = 2000
+            # These models only support default temperature (1.0), don't set temperature parameter
         else:
             completion_params['max_tokens'] = 2000
+            # Allow temperature customization for other models
+            temperature = data.get('temperature', 0.7)
+            if temperature is not None:
+                completion_params['temperature'] = float(temperature)
         
         # Use OpenAI chat completion
         response = client.chat.completions.create(
@@ -1949,7 +1955,6 @@ def execute_skill(plugin_name, skill_name):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.7,
             **completion_params
         )
         
