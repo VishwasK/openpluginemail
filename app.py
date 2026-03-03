@@ -7,6 +7,7 @@ import os
 import secrets
 import hashlib
 import base64
+from pathlib import Path
 from urllib.parse import urlencode
 from flask import Flask, request, jsonify, render_template, redirect, session
 from flask_cors import CORS
@@ -76,26 +77,20 @@ except ImportError:
 OPENPLUGIN_AVAILABLE = False
 PluginManager = None
 try:
-    from pathlib import Path
     # Try importing - if it fails, we'll gracefully degrade
-    import sys
-    import subprocess
-    
-    # First try direct import
+    from openplugin import PluginManager
     try:
-        from openplugin import PluginManager
-        try:
-            from openplugin.providers.openai import OpenAIProvider
-        except ImportError:
-            from openplugin.providers import OpenAIProvider
-        OPENPLUGIN_AVAILABLE = True
-        logger.info("OpenPlugin framework loaded successfully")
+        from openplugin.providers.openai import OpenAIProvider
     except ImportError:
-        # If import fails, try installing from GitHub (only works if git is available)
-        logger.info("OpenPlugin framework not found. Dynamic skill loading will be disabled.")
-        logger.info("To enable: Install manually or ensure openplugin-framework is available")
-        OPENPLUGIN_AVAILABLE = False
-        PluginManager = None
+        from openplugin.providers import OpenAIProvider
+    OPENPLUGIN_AVAILABLE = True
+    logger.info("OpenPlugin framework loaded successfully")
+except ImportError:
+    # If import fails, framework is not available
+    logger.info("OpenPlugin framework not found. Dynamic skill loading will be disabled.")
+    logger.info("To enable: Install manually or ensure openplugin-framework is available")
+    OPENPLUGIN_AVAILABLE = False
+    PluginManager = None
 except Exception as e:
     OPENPLUGIN_AVAILABLE = False
     PluginManager = None
