@@ -1301,6 +1301,57 @@ document.getElementById('searchSkillsMPForm')?.addEventListener('submit', async 
     }
 });
 
+// Import skill from GitHub
+document.getElementById('importGitHubSkillForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('importGitHubSkillBtn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoader = btn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('importGitHubSkillResult');
+    const githubUrl = document.getElementById('githubSkillUrl').value.trim();
+    
+    if (!githubUrl) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = 'Please enter a GitHub URL';
+        return;
+    }
+    
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/skills/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ github_url: githubUrl })
+        });
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'result-message success';
+            resultDiv.textContent = data.message || 'Skill imported successfully';
+            document.getElementById('importGitHubSkillForm').reset();
+            loadPlugins();
+        } else {
+            resultDiv.className = 'result-message error';
+            resultDiv.textContent = `Error: ${data.error || 'Failed to import skill'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = `Network error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
 // Import SkillsMP skill
 async function importSkillsMPSkill(skillId, skillName) {
     const resultDiv = document.getElementById('importPluginResult');
@@ -1319,7 +1370,7 @@ async function importSkillsMPSkill(skillId, skillName) {
     resultDiv.textContent = `Importing "${skillName}"...`;
     
     try {
-        const response = await fetch('/api/skillsmp/import', {
+        const response = await fetch('/api/skills/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ skill_id: skillId, api_key: apiKey })

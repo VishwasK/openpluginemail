@@ -1948,45 +1948,190 @@ def search_skillsmp():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/api/skillsmp/import', methods=['POST'])
-def import_skillsmp_skill():
-    """Import a skill from SkillsMP and convert it to OpenPlugin format"""
+@app.route('/api/skills/import', methods=['POST'])
+def import_skill():
+    """Import a skill from GitHub URL (raw SKILL.md or repo) or SkillsMP"""
     if not OPENPLUGIN_AVAILABLE or not plugin_manager:
         return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
     
     try:
         data = request.get_json() or {}
-        skill_id = data.get('skill_id')
-        skill_url = data.get('skill_url')
+        github_url = data.get('github_url')
+        skill_id = data.get('skill_id')  # For SkillsMP
+        skill_url = data.get('skill_url')  # For SkillsMP
         api_key = data.get('api_key') or os.getenv('SKILLSMP_API_KEY')
         
+        # If GitHub URL provided, import from GitHub
+        if github_url:
+            return import_skill_from_github(github_url)
+        
+        # Otherwise, try SkillsMP import
         if not skill_id and not skill_url:
             return jsonify({
                 'success': False,
-                'error': 'Either "skill_id" or "skill_url" must be provided'
+                'error': 'Either "github_url", "skill_id", or "skill_url" must be provided'
             }), 400
         
-        import tempfile
-        import shutil
-        import zipfile
-        import json as json_lib
+        return import_skill_from_skillsmp(skill_id, skill_url, api_key)
+            
+    except Exception as e:
+        logger.error(f"Error importing skill: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def import_skill_from_github(github_url):
+    """Import a skill directly from GitHub URL"""
+    import tempfile
+    import shutil
+    import json as json_lib
+    import re
+    
+    temp_dir = tempfile.mkdtemp()
+    try:
+        # Handle different GitHub URL formats:
+        # - Raw file: https://raw.githubusercontent.com/owner/repo/branch/path/SKILL.md
+        # - Repo: https://github.com/owner/repo
+        # - Repo with path: https://github.com/owner/repo/tree/branch/path
         
-        # Create temporary directory for the skill
-        temp_dir = tempfile.mkdtemp()
-        try:
-            # Download skill from SkillsMP
-            if skill_id:
-                download_url = f'https://skillsmp.com/api/v1/skills/{skill_id}/download'
+        skill_content = None
+        skill_name = 'imported-skill'
+        skill_description = 'Imported from GitHub'
+        
+        # Check if it's a raw GitHub URL
+        if 'raw.githubusercontent.com' in github_url:
+            response = requests.get(github_url, timeout=30)
+            if response.status_code == 200:
+                skill_content = response.text
+                # Extract name from URL
+                parts = github_url.split('/')
+                if 'SKILL.md' in github_url:
+                    skill_name = parts[-2] if len(parts) > 1 else 'skill'
+        else:
+            # Regular GitHub URL - try to find SKILL.md
+            # Convert to raw URL format
+            github_url = github_url.replace('/blob/', '/').replace('/tree/', '/')
+            if github_url.endswith('.md'):
+                # Direct link to markdown file
+                raw_url = github_url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/')
+                response = requests.get(raw_url, timeout=30)
+                if response.status_code == 200:
+                    skill_content = response.text
+                    skill_name = github_url.split('/')[-1].replace('.md', '').replace('SKILL', 'skill')
             else:
-                # Extract skill ID from URL if provided
-                download_url = skill_url.replace('/skills/', '/api/v1/skills/').rstrip('/') + '/download'
-            
-            # Build headers with API key if available
-            headers = {}
-            if api_key:
-                headers['Authorization'] = f'Bearer {api_key}'
-            
-            response = requests.get(download_url, headers=headers, timeout=30, allow_redirects=True)
+                # Repo URL - try common paths
+                repo_parts = github_url.replace('https://github.com/', '').rstrip('/').split('/')
+                if len(repo_parts) >= 2:
+                    owner, repo = repo_parts[0], repo_parts[1]
+                    branch = repo_parts[2] if len(repo_parts) > 2 and repo_parts[2] != 'tree' else 'main'
+                    
+                    # Try common skill locations
+                    possible_paths = [
+                        f'https://raw.githubusercontent.com/{owner}/{repo}/{branch}/SKILL.md',
+                        f'https://raw.githubusercontent.com/{owner}/{repo}/{branch}/skill.md',
+                        f'https://raw.githubusercontent.com/{owner}/{repo}/main/SKILL.md',
+                        f'https://raw.githubusercontent.com/{owner}/{repo}/master/SKILL.md',
+                        f'https://raw.githubusercontent.com/{owner}/{repo}/{branch}/skills/SKILL.md',
+                    ]
+                    
+                    for path in possible_paths:
+                        try:
+                            response = requests.get(path, timeout=10)
+                            if response.status_code == 200:
+                                skill_content = response.text
+                                skill_name = repo
+                                break
+                        except:
+                            continue
+        
+        if not skill_content:
+            return jsonify({
+                'success': False,
+                'error': 'Could not find SKILL.md file at the provided GitHub URL. Please provide a direct link to SKILL.md or a repository with SKILL.md in the root.'
+            }), 404
+        
+        # Parse YAML frontmatter if present
+        if skill_content.startswith('---'):
+            frontmatter_match = re.match(r'---\n(.*?)\n---\n(.*)', skill_content, re.DOTALL)
+            if frontmatter_match:
+                frontmatter = frontmatter_match.group(1)
+                skill_content = frontmatter_match.group(2)
+                # Extract name and description from frontmatter
+                for line in frontmatter.split('\n'):
+                    if ':' in line:
+                        key, value = line.split(':', 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        if key.lower() == 'name':
+                            skill_name = value
+                        elif key.lower() == 'description':
+                            skill_description = value
+        
+        # Create OpenPlugin-compatible plugin structure
+        plugin_dir = Path(os.getenv('PLUGINS_DIR', './plugins')) / f'github-{skill_name.lower().replace(" ", "-").replace("/", "-")}'
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create .claude-plugin directory and manifest
+        claude_plugin_dir = plugin_dir / '.claude-plugin'
+        claude_plugin_dir.mkdir(exist_ok=True)
+        
+        manifest = {
+            'name': f'github-{skill_name.lower().replace(" ", "-").replace("/", "-")}',
+            'version': '1.0.0',
+            'description': skill_description,
+            'author': 'GitHub',
+            'keywords': ['github', 'imported']
+        }
+        
+        with open(claude_plugin_dir / 'plugin.json', 'w') as f:
+            json_lib.dump(manifest, f, indent=2)
+        
+        # Create skills directory and add skill
+        skills_dir = plugin_dir / 'skills' / skill_name.lower().replace(' ', '-').replace('/', '-')
+        skills_dir.mkdir(parents=True, exist_ok=True)
+        
+        with open(skills_dir / 'SKILL.md', 'w', encoding='utf-8') as f:
+            f.write(skill_content)
+        
+        # Load the plugin
+        plugin = plugin_manager.load_plugin(plugin_dir)
+        
+        return jsonify({
+            'success': True,
+            'plugin': plugin.name,
+            'skill': skill_name,
+            'message': f'Skill "{skill_name}" imported successfully from GitHub'
+        }), 200
+        
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def import_skill_from_skillsmp(skill_id, skill_url, api_key):
+    """Import a skill from SkillsMP"""
+        
+    import tempfile
+    import shutil
+    import zipfile
+    import json as json_lib
+    
+    # Create temporary directory for the skill
+    temp_dir = tempfile.mkdtemp()
+    try:
+        # Download skill from SkillsMP
+        if skill_id:
+            download_url = f'https://skillsmp.com/api/v1/skills/{skill_id}/download'
+        else:
+            # Extract skill ID from URL if provided
+            download_url = skill_url.replace('/skills/', '/api/v1/skills/').rstrip('/') + '/download'
+        
+        # Build headers with API key if available
+        headers = {}
+        if api_key:
+            headers['Authorization'] = f'Bearer {api_key}'
+        
+        response = requests.get(download_url, headers=headers, timeout=30, allow_redirects=True)
             
             if response.status_code == 401:
                 return jsonify({

@@ -459,15 +459,38 @@
                 </div>
 
                 <div class="card">
+                    <h2>Import Skill from GitHub</h2>
+                    <p style="color:var(--text-dim);margin-bottom:16px;">Import skills directly from GitHub - no API key needed!</p>
+                    <form id="importGitHubSkillForm">
+                        <div class="form-group">
+                            <label for="githubSkillUrl">GitHub URL</label>
+                            <input type="text" id="githubSkillUrl" placeholder="https://raw.githubusercontent.com/owner/repo/main/SKILL.md or https://github.com/owner/repo" style="font-family:monospace;">
+                            <small class="help-text">
+                                Direct link to SKILL.md file (raw.githubusercontent.com) or repository URL. 
+                                Examples:<br>
+                                • <code>https://raw.githubusercontent.com/user/repo/main/SKILL.md</code><br>
+                                • <code>https://github.com/user/repo</code> (will auto-detect SKILL.md)
+                            </small>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="importGitHubSkillBtn">
+                            <span class="btn-text">Import from GitHub</span>
+                            <span class="btn-loader" style="display:none;">Importing...</span>
+                        </button>
+                    </form>
+                    <div id="importGitHubSkillResult" class="result-message" style="display:none;margin-top:16px;"></div>
+                </div>
+
+                <div class="card">
                     <h2>Import from SkillsMP</h2>
                     <div class="mfa-info" style="margin-bottom:16px;">
-                        <strong>API Key Required:</strong> SkillsMP requires an API key. Get one at <a href="https://skillsmp.com/settings/api" target="_blank">skillsmp.com/settings/api</a>. Enter it below or set <code>SKILLSMP_API_KEY</code> environment variable.
+                        <strong>Optional:</strong> SkillsMP requires an API key. Get one at <a href="https://skillsmp.com/settings/api" target="_blank">skillsmp.com/settings/api</a>. 
+                        <strong>Tip:</strong> Most skills are available on GitHub - use the GitHub import above instead!
                     </div>
                     <form id="searchSkillsMPForm">
                         <div class="form-group">
-                            <label for="skillsmpApiKey">SkillsMP API Key</label>
+                            <label for="skillsmpApiKey">SkillsMP API Key (optional)</label>
                             <input type="password" id="skillsmpApiKey" placeholder="sk_live_..." autocomplete="off">
-                            <small class="help-text">Your SkillsMP API key (stored locally in browser)</small>
+                            <small class="help-text">Only needed for SkillsMP search. Skills are usually available on GitHub.</small>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
