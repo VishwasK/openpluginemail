@@ -109,6 +109,46 @@ if OPENPLUGIN_AVAILABLE:
         logger.error(f"Failed to initialize PluginManager: {str(e)}")
         plugin_manager = None
 
+# Standalone skill storage (works without OpenPlugin framework)
+SKILLS_DIR = Path(os.getenv('SKILLS_DIR', './skills'))
+SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def get_standalone_skills():
+    """Get list of standalone skills (without OpenPlugin framework)"""
+    skills = []
+    if SKILLS_DIR.exists():
+        for skill_file in SKILLS_DIR.glob('*.md'):
+            skill_name = skill_file.stem
+            try:
+                with open(skill_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                skills.append({
+                    'name': skill_name,
+                    'description': content[:200] + '...' if len(content) > 200 else content,
+                    'content_length': len(content)
+                })
+            except Exception as e:
+                logger.error(f"Error reading skill {skill_name}: {str(e)}")
+    return skills
+
+
+def get_standalone_skill(skill_name):
+    """Get a standalone skill by name"""
+    skill_file = SKILLS_DIR / f'{skill_name}.md'
+    if skill_file.exists():
+        with open(skill_file, 'r', encoding='utf-8') as f:
+            return f.read()
+    return None
+
+
+def save_standalone_skill(skill_name, skill_content):
+    """Save a standalone skill"""
+    skill_file = SKILLS_DIR / f'{skill_name}.md'
+    with open(skill_file, 'w', encoding='utf-8') as f:
+        f.write(skill_content)
+    return skill_file
+
 
 class EmailPlugin:
     """OpenPlugin Email Plugin Implementation"""
@@ -1754,45 +1794,78 @@ def salesforce_execute_action():
 
 @app.route('/api/plugins/list', methods=['GET'])
 def list_plugins():
-    """List all loaded plugins"""
-    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
-        return jsonify({
-            'success': False,
-            'error': 'OpenPlugin framework not available',
-            'plugins': []
-        }), 503
+    """List all loaded plugins and standalone skills"""
+    plugins = []
+    standalone_skills = []
     
+    # Try to get plugins from OpenPlugin framework
+    if OPENPLUGIN_AVAILABLE and plugin_manager:
+        try:
+            for plugin_name in plugin_manager.list_plugins():
+                plugin = plugin_manager.get_plugin(plugin_name)
+                if plugin:
+                    plugins.append({
+                        'name': plugin.name,
+                        'version': plugin.version,
+                        'description': plugin.manifest.description,
+                        'commands': list(plugin.commands.keys()),
+                        'agents': list(plugin.agents.keys()),
+                        'skills': list(plugin.skills.keys()),
+                        'source': 'openplugin'
+                    })
+        except Exception as e:
+            logger.error(f"Error listing OpenPlugin plugins: {str(e)}")
+    
+    # Get standalone skills (no framework required)
     try:
-        plugins = []
-        for plugin_name in plugin_manager.list_plugins():
-            plugin = plugin_manager.get_plugin(plugin_name)
-            if plugin:
-                plugins.append({
-                    'name': plugin.name,
-                    'version': plugin.version,
-                    'description': plugin.manifest.description,
-                    'commands': list(plugin.commands.keys()),
-                    'agents': list(plugin.agents.keys()),
-                    'skills': list(plugin.skills.keys())
-                })
-        
-        return jsonify({
-            'success': True,
-            'plugins': plugins,
-            'count': len(plugins)
-        }), 200
+        standalone_skills = get_standalone_skills()
+        for skill in standalone_skills:
+            plugins.append({
+                'name': f'standalone-{skill["name"]}',
+                'version': '1.0.0',
+                'description': skill['description'],
+                'commands': [],
+                'agents': [],
+                'skills': [skill['name']],
+                'source': 'standalone'
+            })
     except Exception as e:
-        logger.error(f"Error listing plugins: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Error listing standalone skills: {str(e)}")
+    
+    return jsonify({
+        'success': True,
+        'plugins': plugins,
+        'count': len(plugins),
+        'openplugin_available': OPENPLUGIN_AVAILABLE
+    }), 200
 
 
 @app.route('/api/plugins/<plugin_name>/skills', methods=['GET'])
 def list_plugin_skills(plugin_name):
     """List all skills for a specific plugin"""
-    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
-        return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
-    
     try:
+        # Check if it's a standalone skill
+        if plugin_name.startswith('standalone-'):
+            skill_name = plugin_name.replace('standalone-', '')
+            skill_content = get_standalone_skill(skill_name)
+            if skill_content:
+                return jsonify({
+                    'success': True,
+                    'plugin': plugin_name,
+                    'skills': [{
+                        'name': skill_name,
+                        'description': skill_content[:200] + '...' if len(skill_content) > 200 else skill_content,
+                        'content_length': len(skill_content)
+                    }],
+                    'count': 1
+                }), 200
+            else:
+                return jsonify({'success': False, 'error': f'Skill "{skill_name}" not found'}), 404
+        
+        # Try OpenPlugin framework
+        if not OPENPLUGIN_AVAILABLE or not plugin_manager:
+            return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
+        
         plugin = plugin_manager.get_plugin(plugin_name)
         if not plugin:
             return jsonify({'success': False, 'error': f'Plugin "{plugin_name}" not found'}), 404
@@ -1818,10 +1891,7 @@ def list_plugin_skills(plugin_name):
 
 @app.route('/api/plugins/<plugin_name>/skills/<skill_name>/execute', methods=['POST'])
 def execute_skill(plugin_name, skill_name):
-    """Execute a skill from a plugin"""
-    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
-        return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
-    
+    """Execute a skill from a plugin (works with or without OpenPlugin framework)"""
     try:
         data = request.get_json() or {}
         api_key = data.get('openai_api_key')
@@ -1834,42 +1904,48 @@ def execute_skill(plugin_name, skill_name):
                 'error': 'OpenAI API key required for skill execution'
             }), 400
         
-        plugin = plugin_manager.get_plugin(plugin_name)
-        if not plugin:
-            return jsonify({'success': False, 'error': f'Plugin "{plugin_name}" not found'}), 404
+        if not OPENAI_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'error': 'OpenAI package not available'
+            }), 503
         
-        skill_content = plugin.get_skill(skill_name)
+        skill_content = None
+        
+        # Try standalone skill first
+        if plugin_name.startswith('standalone-'):
+            skill_content = get_standalone_skill(skill_name)
+        elif OPENPLUGIN_AVAILABLE and plugin_manager:
+            # Try OpenPlugin framework
+            plugin = plugin_manager.get_plugin(plugin_name)
+            if plugin:
+                skill_content = plugin.get_skill(skill_name)
+        
         if not skill_content:
             return jsonify({
                 'success': False,
                 'error': f'Skill "{skill_name}" not found in plugin "{plugin_name}"'
             }), 404
         
-        # Initialize OpenAI provider
-        provider = OpenAIProvider(api_key=api_key, model=model)
-        
-        # Execute skill using the provider
-        # Skills are markdown prompts that get executed similar to commands
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        # Execute skill using OpenAI directly (no framework needed)
+        client = OpenAI(api_key=api_key, timeout=25.0, max_retries=0)
         
         # Combine skill content with user input
-        full_prompt = f"{skill_content}\n\nUser Input: {user_input}"
+        system_prompt = "You are a helpful assistant executing a skill. Follow the instructions in the skill definition carefully."
+        user_prompt = f"{skill_content}\n\nUser Input: {user_input}"
         
-        # Execute as a command-like operation
-        result = loop.run_until_complete(
-            provider.execute_command(
-                command_content=full_prompt,
-                user_input=user_input,
-                mcp_tools=[],
-                max_tokens=2000,
-                temperature=0.7
-            )
+        # Use OpenAI chat completion
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
         )
+        
+        result = response.choices[0].message.content
         
         return jsonify({
             'success': True,
@@ -1977,10 +2053,7 @@ def import_skill():
 
 
 def import_skill_from_github(github_url):
-    """Import a skill directly from GitHub URL"""
-    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
-        return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
-    
+    """Import a skill directly from GitHub URL (works without OpenPlugin framework)"""
     import tempfile
     import shutil
     import json as json_lib
@@ -2066,39 +2139,49 @@ def import_skill_from_github(github_url):
                         elif key.lower() == 'description':
                             skill_description = value
         
-        # Create OpenPlugin-compatible plugin structure
-        plugin_dir = Path(os.getenv('PLUGINS_DIR', './plugins')) / f'github-{skill_name.lower().replace(" ", "-").replace("/", "-")}'
-        plugin_dir.mkdir(parents=True, exist_ok=True)
+        # Save as standalone skill (works without OpenPlugin framework)
+        safe_name = skill_name.lower().replace(' ', '-').replace('/', '-').replace('\\', '-')
+        skill_file = save_standalone_skill(safe_name, skill_content)
         
-        # Create .claude-plugin directory and manifest
-        claude_plugin_dir = plugin_dir / '.claude-plugin'
-        claude_plugin_dir.mkdir(exist_ok=True)
-        
-        manifest = {
-            'name': f'github-{skill_name.lower().replace(" ", "-").replace("/", "-")}',
-            'version': '1.0.0',
-            'description': skill_description,
-            'author': 'GitHub',
-            'keywords': ['github', 'imported']
-        }
-        
-        with open(claude_plugin_dir / 'plugin.json', 'w') as f:
-            json_lib.dump(manifest, f, indent=2)
-        
-        # Create skills directory and add skill
-        skills_dir = plugin_dir / 'skills' / skill_name.lower().replace(' ', '-').replace('/', '-')
-        skills_dir.mkdir(parents=True, exist_ok=True)
-        
-        with open(skills_dir / 'SKILL.md', 'w', encoding='utf-8') as f:
-            f.write(skill_content)
-        
-        # Load the plugin
-        plugin = plugin_manager.load_plugin(plugin_dir)
+        # Also try to create OpenPlugin structure if framework is available
+        if OPENPLUGIN_AVAILABLE and plugin_manager:
+            try:
+                plugin_dir = Path(os.getenv('PLUGINS_DIR', './plugins')) / f'github-{safe_name}'
+                plugin_dir.mkdir(parents=True, exist_ok=True)
+                
+                claude_plugin_dir = plugin_dir / '.claude-plugin'
+                claude_plugin_dir.mkdir(exist_ok=True)
+                
+                manifest = {
+                    'name': f'github-{safe_name}',
+                    'version': '1.0.0',
+                    'description': skill_description,
+                    'author': 'GitHub',
+                    'keywords': ['github', 'imported']
+                }
+                
+                with open(claude_plugin_dir / 'plugin.json', 'w') as f:
+                    json_lib.dump(manifest, f, indent=2)
+                
+                skills_dir = plugin_dir / 'skills' / safe_name
+                skills_dir.mkdir(parents=True, exist_ok=True)
+                
+                with open(skills_dir / 'SKILL.md', 'w', encoding='utf-8') as f:
+                    f.write(skill_content)
+                
+                # Load the plugin
+                plugin = plugin_manager.load_plugin(plugin_dir)
+                plugin_name = plugin.name
+            except Exception as e:
+                logger.warning(f"Could not create OpenPlugin structure: {str(e)}, using standalone storage")
+                plugin_name = f'standalone-{safe_name}'
+        else:
+            plugin_name = f'standalone-{safe_name}'
         
         return jsonify({
             'success': True,
-            'plugin': plugin.name,
-            'skill': skill_name,
+            'plugin': plugin_name,
+            'skill': safe_name,
             'message': f'Skill "{skill_name}" imported successfully from GitHub'
         }), 200
         
