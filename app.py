@@ -1983,6 +1983,9 @@ def import_skill():
 
 def import_skill_from_github(github_url):
     """Import a skill directly from GitHub URL"""
+    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
+        return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
+    
     import tempfile
     import shutil
     import json as json_lib
@@ -2110,7 +2113,6 @@ def import_skill_from_github(github_url):
 
 def import_skill_from_skillsmp(skill_id, skill_url, api_key):
     """Import a skill from SkillsMP"""
-        
     import tempfile
     import shutil
     import zipfile
@@ -2132,112 +2134,106 @@ def import_skill_from_skillsmp(skill_id, skill_url, api_key):
             headers['Authorization'] = f'Bearer {api_key}'
         
         response = requests.get(download_url, headers=headers, timeout=30, allow_redirects=True)
-            
-            if response.status_code == 401:
-                return jsonify({
-                    'success': False,
-                    'error': 'SkillsMP API authentication required',
-                    'message': 'Please provide a SkillsMP API key. Get one at https://skillsmp.com/settings/api',
-                    'requires_api_key': True
-                }), 401
-            elif response.status_code != 200:
-                return jsonify({
-                    'success': False,
-                    'error': f'Failed to download skill: {response.status_code}',
-                    'details': response.text[:500]
-                }), response.status_code
-            
-            # Save ZIP file
-            zip_path = Path(temp_dir) / 'skill.zip'
-            with open(zip_path, 'wb') as f:
-                f.write(response.content)
-            
-            # Extract ZIP
-            extract_dir = Path(temp_dir) / 'extracted'
-            extract_dir.mkdir()
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
-            
-            # Find SKILL.md file
-            skill_md = None
-            for md_file in extract_dir.rglob('SKILL.md'):
-                skill_md = md_file
-                break
-            
-            if not skill_md:
-                return jsonify({
-                    'success': False,
-                    'error': 'No SKILL.md file found in downloaded package'
-                }), 404
-            
-            # Read skill content
-            with open(skill_md, 'r', encoding='utf-8') as f:
-                skill_content = f.read()
-            
-            # Parse YAML frontmatter if present
-            skill_name = 'imported-skill'
-            skill_description = 'Imported from SkillsMP'
-            if skill_content.startswith('---'):
-                import re
-                frontmatter_match = re.match(r'---\n(.*?)\n---\n(.*)', skill_content, re.DOTALL)
-                if frontmatter_match:
-                    frontmatter = frontmatter_match.group(1)
-                    skill_content = frontmatter_match.group(2)
-                    # Extract name and description from frontmatter
-                    for line in frontmatter.split('\n'):
-                        if ':' in line:
-                            key, value = line.split(':', 1)
-                            key = key.strip()
-                            value = value.strip().strip('"').strip("'")
-                            if key.lower() == 'name':
-                                skill_name = value
-                            elif key.lower() == 'description':
-                                skill_description = value
-            
-            # Create OpenPlugin-compatible plugin structure
-            plugin_dir = Path(os.getenv('PLUGINS_DIR', './plugins')) / f'skillsmp-{skill_name.lower().replace(" ", "-")}'
-            plugin_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Create .claude-plugin directory and manifest
-            claude_plugin_dir = plugin_dir / '.claude-plugin'
-            claude_plugin_dir.mkdir(exist_ok=True)
-            
-            manifest = {
-                'name': f'skillsmp-{skill_name.lower().replace(" ", "-")}',
-                'version': '1.0.0',
-                'description': skill_description,
-                'author': 'SkillsMP',
-                'keywords': ['skillsmp', 'imported']
-            }
-            
-            with open(claude_plugin_dir / 'plugin.json', 'w') as f:
-                json_lib.dump(manifest, f, indent=2)
-            
-            # Create skills directory and add skill
-            skills_dir = plugin_dir / 'skills' / skill_name.lower().replace(' ', '-')
-            skills_dir.mkdir(parents=True, exist_ok=True)
-            
-            with open(skills_dir / 'SKILL.md', 'w', encoding='utf-8') as f:
-                f.write(skill_content)
-            
-            # Load the plugin
-            plugin = plugin_manager.load_plugin(plugin_dir)
-            
+        
+        if response.status_code == 401:
             return jsonify({
-                'success': True,
-                'plugin': plugin.name,
-                'skill': skill_name,
-                'message': f'Skill "{skill_name}" imported successfully from SkillsMP'
-            }), 200
-            
-        finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            
-    except Exception as e:
-        logger.error(f"Error importing SkillsMP skill: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return jsonify({'success': False, 'error': str(e)}), 500
+                'success': False,
+                'error': 'SkillsMP API authentication required',
+                'message': 'Please provide a SkillsMP API key. Get one at https://skillsmp.com/settings/api',
+                'requires_api_key': True
+            }), 401
+        elif response.status_code != 200:
+            return jsonify({
+                'success': False,
+                'error': f'Failed to download skill: {response.status_code}',
+                'details': response.text[:500]
+            }), response.status_code
+        
+        # Save ZIP file
+        zip_path = Path(temp_dir) / 'skill.zip'
+        with open(zip_path, 'wb') as f:
+            f.write(response.content)
+        
+        # Extract ZIP
+        extract_dir = Path(temp_dir) / 'extracted'
+        extract_dir.mkdir()
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_dir)
+        
+        # Find SKILL.md file
+        skill_md = None
+        for md_file in extract_dir.rglob('SKILL.md'):
+            skill_md = md_file
+            break
+        
+        if not skill_md:
+            return jsonify({
+                'success': False,
+                'error': 'No SKILL.md file found in downloaded package'
+            }), 404
+        
+        # Read skill content
+        with open(skill_md, 'r', encoding='utf-8') as f:
+            skill_content = f.read()
+        
+        # Parse YAML frontmatter if present
+        skill_name = 'imported-skill'
+        skill_description = 'Imported from SkillsMP'
+        if skill_content.startswith('---'):
+            import re
+            frontmatter_match = re.match(r'---\n(.*?)\n---\n(.*)', skill_content, re.DOTALL)
+            if frontmatter_match:
+                frontmatter = frontmatter_match.group(1)
+                skill_content = frontmatter_match.group(2)
+                # Extract name and description from frontmatter
+                for line in frontmatter.split('\n'):
+                    if ':' in line:
+                        key, value = line.split(':', 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        if key.lower() == 'name':
+                            skill_name = value
+                        elif key.lower() == 'description':
+                            skill_description = value
+        
+        # Create OpenPlugin-compatible plugin structure
+        plugin_dir = Path(os.getenv('PLUGINS_DIR', './plugins')) / f'skillsmp-{skill_name.lower().replace(" ", "-")}'
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create .claude-plugin directory and manifest
+        claude_plugin_dir = plugin_dir / '.claude-plugin'
+        claude_plugin_dir.mkdir(exist_ok=True)
+        
+        manifest = {
+            'name': f'skillsmp-{skill_name.lower().replace(" ", "-")}',
+            'version': '1.0.0',
+            'description': skill_description,
+            'author': 'SkillsMP',
+            'keywords': ['skillsmp', 'imported']
+        }
+        
+        with open(claude_plugin_dir / 'plugin.json', 'w') as f:
+            json_lib.dump(manifest, f, indent=2)
+        
+        # Create skills directory and add skill
+        skills_dir = plugin_dir / 'skills' / skill_name.lower().replace(' ', '-')
+        skills_dir.mkdir(parents=True, exist_ok=True)
+        
+        with open(skills_dir / 'SKILL.md', 'w', encoding='utf-8') as f:
+            f.write(skill_content)
+        
+        # Load the plugin
+        plugin = plugin_manager.load_plugin(plugin_dir)
+        
+        return jsonify({
+            'success': True,
+            'plugin': plugin.name,
+            'skill': skill_name,
+            'message': f'Skill "{skill_name}" imported successfully from SkillsMP'
+        }), 200
+        
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @app.route('/api/plugins/load', methods=['POST'])
