@@ -1935,9 +1935,9 @@ def execute_skill(plugin_name, skill_name):
         user_prompt = f"{skill_content}\n\nUser Input: {user_input}"
         
         # Determine which parameter to use based on model
-        # Newer models (o1, o3, etc.) use max_completion_tokens instead of max_tokens
+        # Newer models (gpt-5-nano, o1, o3, etc.) use max_completion_tokens instead of max_tokens
         completion_params = {}
-        if model.startswith('o1') or model.startswith('o3'):
+        if model.startswith('gpt-5') or model.startswith('o1') or model.startswith('o3'):
             completion_params['max_completion_tokens'] = 2000
         else:
             completion_params['max_tokens'] = 2000
