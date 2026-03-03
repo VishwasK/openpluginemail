@@ -1117,6 +1117,213 @@ document.getElementById('searchSummarizeForm').addEventListener('submit', async 
     }
 });
 
+// ==================== Dynamic Skills Management ====================
+
+// Load and display plugins
+async function loadPlugins() {
+    const pluginsList = document.getElementById('pluginsList');
+    if (!pluginsList) return;
+    
+    try {
+        const response = await fetch('/api/plugins/list');
+        const data = await response.json();
+        
+        if (data.success && data.plugins.length > 0) {
+            pluginsList.innerHTML = data.plugins.map(plugin => `
+                <div style="padding:16px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border);">
+                    <h3 style="margin:0 0 8px;">${plugin.name} v${plugin.version}</h3>
+                    <p style="color:var(--text-dim);margin:0 0 12px;font-size:.9rem;">${plugin.description || 'No description'}</p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        ${plugin.commands.length > 0 ? `<span style="padding:4px 8px;background:rgba(99,102,241,.15);border-radius:4px;font-size:.8rem;">${plugin.commands.length} commands</span>` : ''}
+                        ${plugin.agents.length > 0 ? `<span style="padding:4px 8px;background:rgba(16,185,129,.15);border-radius:4px;font-size:.8rem;">${plugin.agents.length} agents</span>` : ''}
+                        ${plugin.skills.length > 0 ? `<span style="padding:4px 8px;background:rgba(245,158,11,.15);border-radius:4px;font-size:.8rem;">${plugin.skills.length} skills</span>` : ''}
+                    </div>
+                    ${plugin.skills.length > 0 ? `<button onclick="loadPluginSkills('${plugin.name}')" class="btn btn-primary" style="margin-top:12px;width:auto;">View Skills</button>` : ''}
+                </div>
+            `).join('');
+        } else {
+            pluginsList.innerHTML = '<p style="color:var(--text-dim);">No plugins loaded. Import one to get started!</p>';
+        }
+    } catch (error) {
+        pluginsList.innerHTML = `<p style="color:var(--error);">Error loading plugins: ${error.message}</p>`;
+    }
+}
+
+// Load skills for a plugin
+async function loadPluginSkills(pluginName) {
+    const skillsCard = document.getElementById('skillsCard');
+    const skillsList = document.getElementById('skillsList');
+    const selectedPlugin = document.getElementById('selectedPlugin');
+    
+    if (!skillsCard || !skillsList) return;
+    
+    try {
+        const response = await fetch(`/api/plugins/${pluginName}/skills`);
+        const data = await response.json();
+        
+        if (data.success) {
+            skillsCard.style.display = 'block';
+            selectedPlugin.value = pluginName;
+            
+            if (data.skills.length > 0) {
+                skillsList.innerHTML = data.skills.map(skill => `
+                    <div style="padding:16px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border);">
+                        <h4 style="margin:0 0 8px;">${skill.name}</h4>
+                        <p style="color:var(--text-dim);margin:0 0 12px;font-size:.85rem;">${skill.description}</p>
+                        <button onclick="prepareSkillExecution('${pluginName}', '${skill.name}')" class="btn btn-primary" style="width:auto;">Execute</button>
+                    </div>
+                `).join('');
+            } else {
+                skillsList.innerHTML = '<p style="color:var(--text-dim);">No skills found in this plugin.</p>';
+            }
+            
+            // Scroll to skills section
+            skillsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    } catch (error) {
+        skillsList.innerHTML = `<p style="color:var(--error);">Error loading skills: ${error.message}</p>`;
+    }
+}
+
+// Prepare skill execution form
+function prepareSkillExecution(pluginName, skillName) {
+    const execCard = document.getElementById('executeSkillCard');
+    const execPlugin = document.getElementById('execPlugin');
+    const execSkill = document.getElementById('execSkill');
+    
+    if (!execCard || !execPlugin || !execSkill) return;
+    
+    execPlugin.value = pluginName;
+    execSkill.value = skillName;
+    execCard.style.display = 'block';
+    execCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Import plugin handler
+document.getElementById('importPluginForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('importPluginBtn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoader = btn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('importPluginResult');
+    const githubRepo = document.getElementById('githubRepo').value.trim();
+    const pluginPath = document.getElementById('pluginPath').value.trim();
+    
+    if (!githubRepo && !pluginPath) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = 'Please provide either a GitHub repo or local path';
+        return;
+    }
+    
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const payload = {};
+        if (githubRepo) payload.github_repo = githubRepo;
+        if (pluginPath) payload.path = pluginPath;
+        
+        const response = await fetch('/api/plugins/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'result-message success';
+            resultDiv.textContent = data.message || 'Plugin loaded successfully';
+            document.getElementById('importPluginForm').reset();
+            loadPlugins();
+        } else {
+            resultDiv.className = 'result-message error';
+            resultDiv.textContent = `Error: ${data.error || 'Failed to load plugin'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = `Network error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Execute skill handler
+document.getElementById('executeSkillForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('executeSkillBtn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoader = btn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('executeSkillResult');
+    const pluginName = document.getElementById('execPlugin').value;
+    const skillName = document.getElementById('execSkill').value;
+    const userInput = document.getElementById('skillUserInput').value;
+    const model = document.getElementById('skillModel').value;
+    
+    const creds = getOpenAICredentials();
+    if (!creds.apiKey) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = 'Please configure your OpenAI API key first';
+        return;
+    }
+    
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch(`/api/plugins/${pluginName}/skills/${skillName}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                openai_api_key: creds.apiKey,
+                user_input: userInput,
+                model: model
+            })
+        });
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'story-result success';
+            resultDiv.innerHTML = `<h3>Skill Execution Result</h3><div class="story-text">${String(data.result).replace(/\n/g, '<br>')}</div>`;
+        } else {
+            resultDiv.className = 'story-result error';
+            resultDiv.innerHTML = `Error: ${data.error || 'Failed to execute skill'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'story-result error';
+        resultDiv.innerHTML = `Network error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Refresh plugins button
+document.getElementById('refreshPluginsBtn')?.addEventListener('click', loadPlugins);
+
+// Load plugins when skills page is shown
+document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (btn.dataset.page === 'skills-page') {
+            setTimeout(loadPlugins, 100);
+        }
+    });
+});
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadCredentials();
@@ -1125,6 +1332,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     checkHealth();
     loadPluginInfo();
+    
+    // Load plugins if on skills page
+    if (window.location.hash === '#skills' || document.getElementById('skills-page')?.classList.contains('active')) {
+        loadPlugins();
+    }
     
     // Refresh health status every 30 seconds
     setInterval(checkHealth, 30000);

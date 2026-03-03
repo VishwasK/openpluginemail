@@ -71,6 +71,34 @@ except ImportError:
     Salesforce = None
     logger.warning("simple-salesforce package not available. Salesforce plugin will be disabled.")
 
+# Import OpenPlugin framework for dynamic skill loading
+try:
+    from pathlib import Path
+    from openplugin import PluginManager
+    try:
+        from openplugin.providers.openai import OpenAIProvider
+    except ImportError:
+        # Fallback for different package structure
+        from openplugin.providers import OpenAIProvider
+    OPENPLUGIN_AVAILABLE = True
+except ImportError as e:
+    OPENPLUGIN_AVAILABLE = False
+    PluginManager = None
+    logger.warning(f"openplugin-framework package not available: {str(e)}. Dynamic skill loading will be disabled.")
+
+# Initialize PluginManager for dynamic plugin/skill loading
+plugin_manager = None
+if OPENPLUGIN_AVAILABLE:
+    try:
+        plugins_dir = Path(os.getenv('PLUGINS_DIR', './plugins'))
+        plugins_dir.mkdir(parents=True, exist_ok=True)
+        plugin_manager = PluginManager(plugins_dir=plugins_dir)
+        loaded_plugins = plugin_manager.load_plugins()
+        logger.info(f"Loaded {len(loaded_plugins)} plugins: {loaded_plugins}")
+    except Exception as e:
+        logger.error(f"Failed to initialize PluginManager: {str(e)}")
+        plugin_manager = None
+
 
 class EmailPlugin:
     """OpenPlugin Email Plugin Implementation"""
@@ -1709,6 +1737,218 @@ def salesforce_execute_action():
 
     except Exception as e:
         logger.error(f"Error in salesforce_execute_action endpoint: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== Dynamic Plugin/Skill Management Endpoints ====================
+
+@app.route('/api/plugins/list', methods=['GET'])
+def list_plugins():
+    """List all loaded plugins"""
+    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
+        return jsonify({
+            'success': False,
+            'error': 'OpenPlugin framework not available',
+            'plugins': []
+        }), 503
+    
+    try:
+        plugins = []
+        for plugin_name in plugin_manager.list_plugins():
+            plugin = plugin_manager.get_plugin(plugin_name)
+            if plugin:
+                plugins.append({
+                    'name': plugin.name,
+                    'version': plugin.version,
+                    'description': plugin.manifest.description,
+                    'commands': list(plugin.commands.keys()),
+                    'agents': list(plugin.agents.keys()),
+                    'skills': list(plugin.skills.keys())
+                })
+        
+        return jsonify({
+            'success': True,
+            'plugins': plugins,
+            'count': len(plugins)
+        }), 200
+    except Exception as e:
+        logger.error(f"Error listing plugins: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/plugins/<plugin_name>/skills', methods=['GET'])
+def list_plugin_skills(plugin_name):
+    """List all skills for a specific plugin"""
+    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
+        return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
+    
+    try:
+        plugin = plugin_manager.get_plugin(plugin_name)
+        if not plugin:
+            return jsonify({'success': False, 'error': f'Plugin "{plugin_name}" not found'}), 404
+        
+        skills = []
+        for skill_name, skill_content in plugin.skills.items():
+            skills.append({
+                'name': skill_name,
+                'description': skill_content[:200] + '...' if len(skill_content) > 200 else skill_content,
+                'content_length': len(skill_content)
+            })
+        
+        return jsonify({
+            'success': True,
+            'plugin': plugin_name,
+            'skills': skills,
+            'count': len(skills)
+        }), 200
+    except Exception as e:
+        logger.error(f"Error listing skills for {plugin_name}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/plugins/<plugin_name>/skills/<skill_name>/execute', methods=['POST'])
+def execute_skill(plugin_name, skill_name):
+    """Execute a skill from a plugin"""
+    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
+        return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
+    
+    try:
+        data = request.get_json() or {}
+        api_key = data.get('openai_api_key')
+        user_input = data.get('user_input', '')
+        model = data.get('model', 'gpt-4')
+        
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'OpenAI API key required for skill execution'
+            }), 400
+        
+        plugin = plugin_manager.get_plugin(plugin_name)
+        if not plugin:
+            return jsonify({'success': False, 'error': f'Plugin "{plugin_name}" not found'}), 404
+        
+        skill_content = plugin.get_skill(skill_name)
+        if not skill_content:
+            return jsonify({
+                'success': False,
+                'error': f'Skill "{skill_name}" not found in plugin "{plugin_name}"'
+            }), 404
+        
+        # Initialize OpenAI provider
+        provider = OpenAIProvider(api_key=api_key, model=model)
+        
+        # Execute skill using the provider
+        # Skills are markdown prompts that get executed similar to commands
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # Combine skill content with user input
+        full_prompt = f"{skill_content}\n\nUser Input: {user_input}"
+        
+        # Execute as a command-like operation
+        result = loop.run_until_complete(
+            provider.execute_command(
+                command_content=full_prompt,
+                user_input=user_input,
+                mcp_tools=[],
+                max_tokens=2000,
+                temperature=0.7
+            )
+        )
+        
+        return jsonify({
+            'success': True,
+            'plugin': plugin_name,
+            'skill': skill_name,
+            'result': result
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error executing skill {plugin_name}/{skill_name}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/plugins/load', methods=['POST'])
+def load_plugin():
+    """Load a plugin from a directory path or GitHub repo"""
+    if not OPENPLUGIN_AVAILABLE or not plugin_manager:
+        return jsonify({'success': False, 'error': 'OpenPlugin framework not available'}), 503
+    
+    try:
+        data = request.get_json() or {}
+        plugin_path = data.get('path')
+        github_repo = data.get('github_repo')
+        
+        if github_repo:
+            # Clone from GitHub
+            import subprocess
+            import tempfile
+            import shutil
+            
+            temp_dir = tempfile.mkdtemp()
+            try:
+                repo_url = f"https://github.com/{github_repo}.git"
+                subprocess.run(['git', 'clone', repo_url, temp_dir], check=True, capture_output=True)
+                
+                # Find plugin directory
+                plugin_dir = Path(temp_dir)
+                if (plugin_dir / '.claude-plugin' / 'plugin.json').exists():
+                    plugin = plugin_manager.load_plugin(plugin_dir)
+                    return jsonify({
+                        'success': True,
+                        'plugin': plugin.name,
+                        'version': plugin.version,
+                        'message': f'Plugin "{plugin.name}" loaded successfully'
+                    }), 200
+                else:
+                    # Look for plugins subdirectory
+                    plugins_subdir = plugin_dir / 'plugins'
+                    if plugins_subdir.exists():
+                        loaded = plugin_manager.load_plugins(plugins_subdir)
+                        return jsonify({
+                            'success': True,
+                            'plugins': loaded,
+                            'message': f'Loaded {len(loaded)} plugins from GitHub'
+                        }), 200
+                    else:
+                        return jsonify({
+                            'success': False,
+                            'error': 'No plugin found in GitHub repository'
+                        }), 404
+            finally:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+        
+        elif plugin_path:
+            # Load from local path
+            plugin_dir = Path(plugin_path)
+            if not plugin_dir.exists():
+                return jsonify({'success': False, 'error': f'Path not found: {plugin_path}'}), 404
+            
+            plugin = plugin_manager.load_plugin(plugin_dir)
+            return jsonify({
+                'success': True,
+                'plugin': plugin.name,
+                'version': plugin.version,
+                'message': f'Plugin "{plugin.name}" loaded successfully'
+            }), 200
+        
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Either "path" or "github_repo" must be provided'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error loading plugin: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

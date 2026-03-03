@@ -30,6 +30,10 @@
                     <span class="nav-icon">&#9729;</span>
                     <span class="nav-label">Salesforce</span>
                 </button>
+                <button class="nav-item" data-page="skills-page">
+                    <span class="nav-icon">&#128161;</span>
+                    <span class="nav-label">Skills</span>
+                </button>
                 <button class="nav-item" data-page="info-page">
                     <span class="nav-icon">&#9881;</span>
                     <span class="nav-label">Info</span>
@@ -447,6 +451,85 @@
                 </div>
             </section>
 
+            <!-- ==================== SKILLS PAGE ==================== -->
+            <section id="skills-page" class="page">
+                <div class="page-header">
+                    <h1>Dynamic Skills</h1>
+                    <p>Import and execute skills from OpenPlugin plugins dynamically</p>
+                </div>
+
+                <div class="card">
+                    <h2>Import Plugin</h2>
+                    <form id="importPluginForm">
+                        <div class="form-group">
+                            <label>Import from GitHub</label>
+                            <input type="text" id="githubRepo" placeholder="owner/repo (e.g., VishwasK/openplugin)" style="font-family:monospace;">
+                            <small class="help-text">Enter GitHub repository in format: owner/repo</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Or import from local path</label>
+                            <input type="text" id="pluginPath" placeholder="/path/to/plugin">
+                            <small class="help-text">Absolute path to plugin directory on server</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="importPluginBtn">
+                            <span class="btn-text">Import Plugin</span>
+                            <span class="btn-loader" style="display:none;">Importing...</span>
+                        </button>
+                    </form>
+                    <div id="importPluginResult" class="result-message" style="display:none;margin-top:16px;"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Loaded Plugins</h2>
+                    <button type="button" class="btn btn-ghost" id="refreshPluginsBtn" style="margin-bottom:16px;">Refresh List</button>
+                    <div id="pluginsList" style="display:grid;gap:12px;">
+                        <p style="color:var(--text-dim);">Loading plugins...</p>
+                    </div>
+                </div>
+
+                <div class="card" id="skillsCard" style="display:none;">
+                    <h2>Available Skills</h2>
+                    <div class="form-group">
+                        <label for="selectedPlugin">Plugin</label>
+                        <select id="selectedPlugin" style="margin-bottom:16px;">
+                            <option value="">Select a plugin...</option>
+                        </select>
+                    </div>
+                    <div id="skillsList" style="display:grid;gap:12px;"></div>
+                </div>
+
+                <div class="card" id="executeSkillCard" style="display:none;">
+                    <h2>Execute Skill</h2>
+                    <form id="executeSkillForm">
+                        <div class="form-group">
+                            <label>Plugin</label>
+                            <input type="text" id="execPlugin" readonly style="background:var(--bg-input);">
+                        </div>
+                        <div class="form-group">
+                            <label>Skill</label>
+                            <input type="text" id="execSkill" readonly style="background:var(--bg-input);">
+                        </div>
+                        <div class="form-group">
+                            <label for="skillUserInput">User Input</label>
+                            <textarea id="skillUserInput" rows="4" placeholder="Enter input for the skill..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="skillModel">Model</label>
+                            <select id="skillModel">
+                                <option value="gpt-4">GPT-4</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                <option value="gpt-5-nano">GPT-5 Nano</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="executeSkillBtn">
+                            <span class="btn-text">Execute Skill</span>
+                            <span class="btn-loader" style="display:none;">Executing...</span>
+                        </button>
+                    </form>
+                    <div id="executeSkillResult" class="story-result" style="display:none;"></div>
+                </div>
+            </section>
+
             <!-- ==================== INFO PAGE ==================== -->
             <section id="info-page" class="page">
                 <div class="page-header">
@@ -519,7 +602,7 @@
 
     // Handle hash-based deep linking (e.g. /#salesforce after OAuth callback)
     function handleHash() {
-        const map = { salesforce: 'salesforce-page', email: 'email-page', stories: 'stories-page', search: 'search-page', info: 'info-page' };
+        const map = { salesforce: 'salesforce-page', email: 'email-page', stories: 'stories-page', search: 'search-page', skills: 'skills-page', info: 'info-page' };
         const hash = window.location.hash.replace('#', '');
         const pageId = map[hash];
         if (pageId) {
