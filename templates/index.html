@@ -460,7 +460,15 @@
 
                 <div class="card">
                     <h2>Import from SkillsMP</h2>
+                    <div class="mfa-info" style="margin-bottom:16px;">
+                        <strong>API Key Required:</strong> SkillsMP requires an API key. Get one at <a href="https://skillsmp.com/settings/api" target="_blank">skillsmp.com/settings/api</a>. Enter it below or set <code>SKILLSMP_API_KEY</code> environment variable.
+                    </div>
                     <form id="searchSkillsMPForm">
+                        <div class="form-group">
+                            <label for="skillsmpApiKey">SkillsMP API Key</label>
+                            <input type="password" id="skillsmpApiKey" placeholder="sk_live_..." autocomplete="off">
+                            <small class="help-text">Your SkillsMP API key (stored locally in browser)</small>
+                        </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="skillsmpQuery">Search Query</label>

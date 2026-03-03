@@ -1199,6 +1199,29 @@ function prepareSkillExecution(pluginName, skillName) {
     execCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// SkillsMP API key storage
+const SKILLSMP_API_KEY = 'openplugin_skillsmp_api_key';
+
+function getSkillsMPApiKey() {
+    return localStorage.getItem(SKILLSMP_API_KEY) || '';
+}
+
+function saveSkillsMPApiKey(key) {
+    if (key) {
+        localStorage.setItem(SKILLSMP_API_KEY, key);
+    } else {
+        localStorage.removeItem(SKILLSMP_API_KEY);
+    }
+}
+
+// Load API key on page load
+function loadSkillsMPApiKey() {
+    const apiKeyInput = document.getElementById('skillsmpApiKey');
+    if (apiKeyInput) {
+        apiKeyInput.value = getSkillsMPApiKey();
+    }
+}
+
 // SkillsMP search handler
 document.getElementById('searchSkillsMPForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1208,6 +1231,14 @@ document.getElementById('searchSkillsMPForm')?.addEventListener('submit', async 
     const resultsDiv = document.getElementById('skillsmpResults');
     const query = document.getElementById('skillsmpQuery').value.trim();
     const category = document.getElementById('skillsmpCategory').value.trim();
+    const apiKey = document.getElementById('skillsmpApiKey').value.trim();
+    
+    if (!apiKey) {
+        resultsDiv.style.display = 'block';
+        resultsDiv.className = 'result-message error';
+        resultsDiv.innerHTML = 'Please enter your SkillsMP API key. Get one at <a href="https://skillsmp.com/settings/api" target="_blank">skillsmp.com/settings/api</a>';
+        return;
+    }
     
     if (!query && !category) {
         resultsDiv.style.display = 'block';
@@ -1215,6 +1246,9 @@ document.getElementById('searchSkillsMPForm')?.addEventListener('submit', async 
         resultsDiv.innerHTML = 'Please provide either a search query or category';
         return;
     }
+    
+    // Save API key
+    saveSkillsMPApiKey(apiKey);
     
     btn.disabled = true;
     btnText.style.display = 'none';
@@ -1225,13 +1259,16 @@ document.getElementById('searchSkillsMPForm')?.addEventListener('submit', async 
         const response = await fetch('/api/skillsmp/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, category, limit: 20 })
+            body: JSON.stringify({ query, category, limit: 20, api_key: apiKey })
         });
         
         const data = await response.json();
         resultsDiv.style.display = 'block';
         
-        if (data.success && data.skills && data.skills.length > 0) {
+        if (data.requires_api_key || response.status === 401) {
+            resultsDiv.className = 'result-message error';
+            resultsDiv.innerHTML = `<strong>Authentication Required:</strong> ${data.message || 'Please provide a valid SkillsMP API key. Get one at <a href="https://skillsmp.com/settings/api" target="_blank">skillsmp.com/settings/api</a>'}`;
+        } else if (data.success && data.skills && data.skills.length > 0) {
             resultsDiv.className = 'result-message success';
             resultsDiv.innerHTML = `
                 <h3 style="margin-top:0;">Found ${data.total || data.skills.length} skills</h3>
@@ -1269,6 +1306,14 @@ async function importSkillsMPSkill(skillId, skillName) {
     const resultDiv = document.getElementById('importPluginResult');
     if (!resultDiv) return;
     
+    const apiKey = getSkillsMPApiKey();
+    if (!apiKey) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result-message error';
+        resultDiv.innerHTML = 'Please enter your SkillsMP API key first';
+        return;
+    }
+    
     resultDiv.style.display = 'block';
     resultDiv.className = 'result-message';
     resultDiv.textContent = `Importing "${skillName}"...`;
@@ -1277,12 +1322,15 @@ async function importSkillsMPSkill(skillId, skillName) {
         const response = await fetch('/api/skillsmp/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ skill_id: skillId })
+            body: JSON.stringify({ skill_id: skillId, api_key: apiKey })
         });
         
         const data = await response.json();
         
-        if (data.success) {
+        if (data.requires_api_key || response.status === 401) {
+            resultDiv.className = 'result-message error';
+            resultDiv.innerHTML = `<strong>Authentication Required:</strong> ${data.message || 'Please provide a valid SkillsMP API key'}`;
+        } else if (data.success) {
             resultDiv.className = 'result-message success';
             resultDiv.textContent = data.message || `Skill "${skillName}" imported successfully`;
             loadPlugins();
@@ -1426,6 +1474,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadCredentials();
     loadOpenAICredentials();
     loadSalesforceCredentials();
+    loadSkillsMPApiKey();
     initTabs();
     checkHealth();
     loadPluginInfo();

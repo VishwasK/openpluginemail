@@ -1898,6 +1898,7 @@ def search_skillsmp():
         query = data.get('query', '')
         category = data.get('category', '')
         limit = data.get('limit', 20)
+        api_key = data.get('api_key') or os.getenv('SKILLSMP_API_KEY')
         
         if not query and not category:
             return jsonify({
@@ -1905,7 +1906,7 @@ def search_skillsmp():
                 'error': 'Either "query" or "category" must be provided'
             }), 400
         
-        # Build search URL
+        # Build search URL - try public endpoint first, then authenticated
         search_url = 'https://skillsmp.com/api/v1/skills/search'
         params = {'limit': min(limit, 100)}
         if query:
@@ -1913,8 +1914,13 @@ def search_skillsmp():
         if category:
             params['category'] = category
         
+        # Build headers
+        headers = {}
+        if api_key:
+            headers['Authorization'] = f'Bearer {api_key}'
+        
         # Make request to SkillsMP API
-        response = requests.get(search_url, params=params, timeout=10)
+        response = requests.get(search_url, params=params, headers=headers, timeout=10)
         
         if response.status_code == 200:
             results = response.json()
@@ -1923,6 +1929,13 @@ def search_skillsmp():
                 'skills': results.get('skills', []),
                 'total': results.get('total', 0)
             }), 200
+        elif response.status_code == 401:
+            return jsonify({
+                'success': False,
+                'error': 'SkillsMP API authentication required',
+                'message': 'Please provide a SkillsMP API key. Get one at https://skillsmp.com/settings/api',
+                'requires_api_key': True
+            }), 401
         else:
             return jsonify({
                 'success': False,
@@ -1945,6 +1958,7 @@ def import_skillsmp_skill():
         data = request.get_json() or {}
         skill_id = data.get('skill_id')
         skill_url = data.get('skill_url')
+        api_key = data.get('api_key') or os.getenv('SKILLSMP_API_KEY')
         
         if not skill_id and not skill_url:
             return jsonify({
@@ -1967,12 +1981,25 @@ def import_skillsmp_skill():
                 # Extract skill ID from URL if provided
                 download_url = skill_url.replace('/skills/', '/api/v1/skills/').rstrip('/') + '/download'
             
-            response = requests.get(download_url, timeout=30, allow_redirects=True)
+            # Build headers with API key if available
+            headers = {}
+            if api_key:
+                headers['Authorization'] = f'Bearer {api_key}'
             
-            if response.status_code != 200:
+            response = requests.get(download_url, headers=headers, timeout=30, allow_redirects=True)
+            
+            if response.status_code == 401:
                 return jsonify({
                     'success': False,
-                    'error': f'Failed to download skill: {response.status_code}'
+                    'error': 'SkillsMP API authentication required',
+                    'message': 'Please provide a SkillsMP API key. Get one at https://skillsmp.com/settings/api',
+                    'requires_api_key': True
+                }), 401
+            elif response.status_code != 200:
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to download skill: {response.status_code}',
+                    'details': response.text[:500]
                 }), response.status_code
             
             # Save ZIP file
