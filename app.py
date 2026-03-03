@@ -1949,20 +1949,39 @@ def execute_skill(plugin_name, skill_name):
                 completion_params['temperature'] = float(temperature)
         
         # Use OpenAI chat completion
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            **completion_params
-        )
-        
-        result = response.choices[0].message.content
-        
-        # Handle empty or None results
-        if not result:
-            result = "Skill executed successfully but returned no output. The model may have completed the task without generating text."
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                **completion_params
+            )
+            
+            logger.info(f"API response received: {type(response)}, choices count: {len(response.choices) if hasattr(response, 'choices') else 0}")
+            
+            # Extract result with better error handling
+            if not hasattr(response, 'choices') or not response.choices:
+                logger.error(f"No choices in response: {response}")
+                result = f"Error: API returned no choices. Response: {str(response)[:500]}"
+            elif not hasattr(response.choices[0], 'message'):
+                logger.error(f"No message in first choice: {response.choices[0]}")
+                result = f"Error: API response structure unexpected. First choice: {str(response.choices[0])[:500]}"
+            else:
+                result = response.choices[0].message.content
+                logger.info(f"Extracted result: type={type(result)}, length={len(str(result)) if result else 0}, preview={str(result)[:100] if result else 'None'}")
+            
+            # Handle empty or None results
+            if not result or (isinstance(result, str) and not result.strip()):
+                result = "Skill executed successfully but returned no output. The model may have completed the task without generating text, or the response was empty."
+                logger.warning(f"Empty result for {plugin_name}/{skill_name} with model {model}")
+            
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {str(api_error)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            raise
         
         logger.info(f"Skill execution completed: {plugin_name}/{skill_name}, result length: {len(str(result))}")
         
