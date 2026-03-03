@@ -1934,6 +1934,14 @@ def execute_skill(plugin_name, skill_name):
         system_prompt = "You are a helpful assistant executing a skill. Follow the instructions in the skill definition carefully."
         user_prompt = f"{skill_content}\n\nUser Input: {user_input}"
         
+        # Determine which parameter to use based on model
+        # Newer models (o1, o3, etc.) use max_completion_tokens instead of max_tokens
+        completion_params = {}
+        if model.startswith('o1') or model.startswith('o3'):
+            completion_params['max_completion_tokens'] = 2000
+        else:
+            completion_params['max_tokens'] = 2000
+        
         # Use OpenAI chat completion
         response = client.chat.completions.create(
             model=model,
@@ -1942,7 +1950,7 @@ def execute_skill(plugin_name, skill_name):
                 {"role": "user", "content": user_prompt}
             ],
             temperature=0.7,
-            max_tokens=2000
+            **completion_params
         )
         
         result = response.choices[0].message.content
@@ -1958,6 +1966,79 @@ def execute_skill(plugin_name, skill_name):
         logger.error(f"Error executing skill {plugin_name}/{skill_name}: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/plugins/<plugin_name>/skills/<skill_name>/content', methods=['GET'])
+def get_skill_content(plugin_name, skill_name):
+    """Get the full content of a skill (for viewing/editing)"""
+    try:
+        skill_content = None
+        
+        # Try standalone skill first
+        if plugin_name.startswith('standalone-'):
+            skill_content = get_standalone_skill(skill_name)
+        elif OPENPLUGIN_AVAILABLE and plugin_manager:
+            # Try OpenPlugin framework
+            plugin = plugin_manager.get_plugin(plugin_name)
+            if plugin:
+                skill_content = plugin.get_skill(skill_name)
+        
+        if not skill_content:
+            return jsonify({
+                'success': False,
+                'error': f'Skill "{skill_name}" not found in plugin "{plugin_name}"'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'plugin': plugin_name,
+            'skill': skill_name,
+            'content': skill_content
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting skill content {plugin_name}/{skill_name}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/plugins/<plugin_name>/skills/<skill_name>/content', methods=['PUT'])
+def update_skill_content(plugin_name, skill_name):
+    """Update the content of a skill"""
+    try:
+        data = request.get_json() or {}
+        new_content = data.get('content')
+        
+        if not new_content:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required field: content'
+            }), 400
+        
+        # Try standalone skill first
+        if plugin_name.startswith('standalone-'):
+            save_standalone_skill(skill_name, new_content)
+            return jsonify({
+                'success': True,
+                'plugin': plugin_name,
+                'skill': skill_name,
+                'message': 'Skill content updated successfully'
+            }), 200
+        elif OPENPLUGIN_AVAILABLE and plugin_manager:
+            # For OpenPlugin skills, we'd need to update the file directly
+            # This is more complex - for now, return an error suggesting to use standalone
+            return jsonify({
+                'success': False,
+                'error': 'Editing OpenPlugin framework skills is not yet supported. Consider importing as standalone skill for editing.'
+            }), 400
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Skill "{skill_name}" not found in plugin "{plugin_name}"'
+            }), 404
+        
+    except Exception as e:
+        logger.error(f"Error updating skill content {plugin_name}/{skill_name}: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

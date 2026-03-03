@@ -590,6 +590,32 @@
                     </form>
                     <div id="executeSkillResult" class="story-result" style="display:none;"></div>
                 </div>
+
+                <div class="card" id="viewEditSkillCard" style="display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                        <h2 id="viewEditSkillTitle">Skill Content</h2>
+                        <button onclick="closeSkillViewEdit()" class="btn btn-ghost" style="width:auto;">Close</button>
+                    </div>
+                    <div id="viewSkillContent" style="display:none;">
+                        <pre id="skillContentDisplay" style="background:var(--bg-input);padding:16px;border-radius:8px;border:1px solid var(--border);overflow-x:auto;white-space:pre-wrap;font-family:monospace;font-size:.9rem;max-height:500px;overflow-y:auto;"></pre>
+                    </div>
+                    <div id="editSkillContent" style="display:none;">
+                        <form id="editSkillForm">
+                            <div class="form-group">
+                                <label>Skill Content (SKILL.md)</label>
+                                <textarea id="skillContentEditor" rows="20" style="font-family:monospace;font-size:.9rem;" placeholder="Skill content..."></textarea>
+                            </div>
+                            <div style="display:flex;gap:8px;">
+                                <button type="submit" class="btn btn-primary" id="saveSkillBtn">
+                                    <span class="btn-text">Save Changes</span>
+                                    <span class="btn-loader" style="display:none;">Saving...</span>
+                                </button>
+                                <button type="button" onclick="closeSkillViewEdit()" class="btn btn-ghost">Cancel</button>
+                            </div>
+                        </form>
+                        <div id="editSkillResult" class="result-message" style="display:none;margin-top:16px;"></div>
+                    </div>
+                </div>
             </section>
 
             <!-- ==================== INFO PAGE ==================== -->

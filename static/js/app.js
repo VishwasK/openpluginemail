@@ -1178,7 +1178,11 @@ async function loadPluginSkills(pluginName) {
                     <div style="padding:16px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border);">
                         <h4 style="margin:0 0 8px;">${skill.name}</h4>
                         <p style="color:var(--text-dim);margin:0 0 12px;font-size:.85rem;">${skill.description}</p>
-                        <button onclick="prepareSkillExecution('${pluginName}', '${skill.name}')" class="btn btn-primary" style="width:auto;">Execute</button>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button onclick="prepareSkillExecution('${pluginName}', '${skill.name}')" class="btn btn-primary" style="width:auto;">Execute</button>
+                            <button onclick="viewSkillContent('${pluginName}', '${skill.name}')" class="btn btn-ghost" style="width:auto;">View</button>
+                            ${pluginName.startsWith('standalone-') ? `<button onclick="editSkillContent('${pluginName}', '${skill.name}')" class="btn btn-ghost" style="width:auto;">Edit</button>` : ''}
+                        </div>
                     </div>
                 `).join('');
             } else {
@@ -1515,6 +1519,147 @@ document.getElementById('executeSkillForm')?.addEventListener('submit', async (e
         btnLoader.style.display = 'none';
     }
 });
+
+// View skill content
+async function viewSkillContent(pluginName, skillName) {
+    const viewEditCard = document.getElementById('viewEditSkillCard');
+    const viewDiv = document.getElementById('viewSkillContent');
+    const editDiv = document.getElementById('editSkillContent');
+    const title = document.getElementById('viewEditSkillTitle');
+    const contentDisplay = document.getElementById('skillContentDisplay');
+    
+    if (!viewEditCard) return;
+    
+    viewEditCard.style.display = 'block';
+    viewDiv.style.display = 'block';
+    editDiv.style.display = 'none';
+    title.textContent = `View: ${skillName}`;
+    contentDisplay.textContent = 'Loading...';
+    
+    try {
+        const response = await fetch(`/api/plugins/${pluginName}/skills/${skillName}/content`);
+        const data = await response.json();
+        
+        if (data.success) {
+            contentDisplay.textContent = data.content;
+        } else {
+            contentDisplay.textContent = `Error: ${data.error || 'Failed to load skill content'}`;
+        }
+    } catch (error) {
+        contentDisplay.textContent = `Network error: ${error.message}`;
+    }
+    
+    viewEditCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+
+// Close view/edit card
+function closeSkillViewEdit() {
+    const viewEditCard = document.getElementById('viewEditSkillCard');
+    if (viewEditCard) {
+        viewEditCard.style.display = 'none';
+    }
+}
+
+// Save edited skill content
+document.getElementById('editSkillForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('saveSkillBtn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoader = btn.querySelector('.btn-loader');
+    const resultDiv = document.getElementById('editSkillResult');
+    const editor = document.getElementById('skillContentEditor');
+    const title = document.getElementById('viewEditSkillTitle');
+    
+    // Extract plugin and skill name from title
+    const titleText = title.textContent;
+    const match = titleText.match(/Edit: (.+)/);
+    if (!match) return;
+    
+    // Get plugin name from current context (we need to store this)
+    const pluginName = window.currentEditingPlugin || '';
+    const skillName = match[1];
+    
+    if (!pluginName) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = 'Error: Plugin name not found';
+        return;
+    }
+    
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+    resultDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch(`/api/plugins/${pluginName}/skills/${skillName}/content`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: editor.value })
+        });
+        
+        const data = await response.json();
+        resultDiv.style.display = 'block';
+        
+        if (data.success) {
+            resultDiv.className = 'result-message success';
+            resultDiv.textContent = 'Skill content updated successfully!';
+            // Reload plugins to show updated content
+            setTimeout(() => {
+                loadPlugins();
+                closeSkillViewEdit();
+            }, 1000);
+        } else {
+            resultDiv.className = 'result-message error';
+            resultDiv.textContent = `Error: ${data.error || 'Failed to update skill content'}`;
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result-message error';
+        resultDiv.textContent = `Network error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+    }
+});
+
+// Store plugin name when editing
+function editSkillContent(pluginName, skillName) {
+    window.currentEditingPlugin = pluginName;
+    const viewEditCard = document.getElementById('viewEditSkillCard');
+    const viewDiv = document.getElementById('viewSkillContent');
+    const editDiv = document.getElementById('editSkillContent');
+    const title = document.getElementById('viewEditSkillTitle');
+    const editor = document.getElementById('skillContentEditor');
+    
+    if (!viewEditCard || !pluginName.startsWith('standalone-')) {
+        alert('Only standalone skills can be edited.');
+        return;
+    }
+    
+    viewEditCard.style.display = 'block';
+    viewDiv.style.display = 'none';
+    editDiv.style.display = 'block';
+    title.textContent = `Edit: ${skillName}`;
+    editor.value = 'Loading...';
+    
+    fetch(`/api/plugins/${pluginName}/skills/${skillName}/content`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                editor.value = data.content;
+            } else {
+                editor.value = `Error: ${data.error || 'Failed to load skill content'}`;
+            }
+        })
+        .catch(error => {
+            editor.value = `Network error: ${error.message}`;
+        });
+    
+    viewEditCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 // Refresh plugins button
 document.getElementById('refreshPluginsBtn')?.addEventListener('click', loadPlugins);
