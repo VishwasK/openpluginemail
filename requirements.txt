@@ -6,4 +6,4 @@ requests==2.31.0
 openai>=1.50.0
 duckduckgo-search>=6.0.0
 simple-salesforce>=1.12.0
-git+https://github.com/VishwasK/openplugin.git@main#egg=openplugin-framework
+# openplugin-framework - install manually if needed: pip install git+https://github.com/VishwasK/openplugin.git@main#subdirectory=openplugin

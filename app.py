@@ -72,19 +72,34 @@ except ImportError:
     logger.warning("simple-salesforce package not available. Salesforce plugin will be disabled.")
 
 # Import OpenPlugin framework for dynamic skill loading
+# Note: This is optional - the app works without it, but dynamic skill loading will be disabled
+OPENPLUGIN_AVAILABLE = False
+PluginManager = None
 try:
     from pathlib import Path
-    from openplugin import PluginManager
+    # Try importing - if it fails, we'll gracefully degrade
+    import sys
+    import subprocess
+    
+    # First try direct import
     try:
-        from openplugin.providers.openai import OpenAIProvider
+        from openplugin import PluginManager
+        try:
+            from openplugin.providers.openai import OpenAIProvider
+        except ImportError:
+            from openplugin.providers import OpenAIProvider
+        OPENPLUGIN_AVAILABLE = True
+        logger.info("OpenPlugin framework loaded successfully")
     except ImportError:
-        # Fallback for different package structure
-        from openplugin.providers import OpenAIProvider
-    OPENPLUGIN_AVAILABLE = True
-except ImportError as e:
+        # If import fails, try installing from GitHub (only works if git is available)
+        logger.info("OpenPlugin framework not found. Dynamic skill loading will be disabled.")
+        logger.info("To enable: Install manually or ensure openplugin-framework is available")
+        OPENPLUGIN_AVAILABLE = False
+        PluginManager = None
+except Exception as e:
     OPENPLUGIN_AVAILABLE = False
     PluginManager = None
-    logger.warning(f"openplugin-framework package not available: {str(e)}. Dynamic skill loading will be disabled.")
+    logger.warning(f"Could not load OpenPlugin framework: {str(e)}. Dynamic skill loading will be disabled.")
 
 # Initialize PluginManager for dynamic plugin/skill loading
 plugin_manager = None
