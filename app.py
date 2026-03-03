@@ -1960,6 +1960,12 @@ def execute_skill(plugin_name, skill_name):
         
         result = response.choices[0].message.content
         
+        # Handle empty or None results
+        if not result:
+            result = "Skill executed successfully but returned no output. The model may have completed the task without generating text."
+        
+        logger.info(f"Skill execution completed: {plugin_name}/{skill_name}, result length: {len(str(result))}")
+        
         return jsonify({
             'success': True,
             'plugin': plugin_name,

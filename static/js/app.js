@@ -1540,10 +1540,14 @@ document.getElementById('executeSkillForm')?.addEventListener('submit', async (e
         
         if (data.success) {
             resultDiv.className = 'story-result success';
-            resultDiv.innerHTML = `<h3>Skill Execution Result</h3><div class="story-text">${String(data.result).replace(/\n/g, '<br>')}</div>`;
+            // Handle empty/null/undefined results
+            const resultText = data.result || data.message || 'Skill executed successfully but returned no output.';
+            const displayText = String(resultText).trim() || 'Skill executed successfully but returned no output.';
+            resultDiv.innerHTML = `<h3>Skill Execution Result</h3><div class="story-text">${displayText.replace(/\n/g, '<br>')}</div>`;
         } else {
             resultDiv.className = 'story-result error';
-            resultDiv.innerHTML = `<h3>Error</h3><div class="story-text">${data.error || 'Failed to execute skill'}</div>`;
+            const errorText = data.error || data.message || 'Failed to execute skill';
+            resultDiv.innerHTML = `<h3>Error</h3><div class="story-text">${String(errorText).replace(/\n/g, '<br>')}</div>`;
         }
         
         // Scroll to results so user can see them
