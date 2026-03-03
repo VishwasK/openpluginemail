@@ -1129,18 +1129,26 @@ async function loadPlugins() {
         const data = await response.json();
         
         if (data.success && data.plugins.length > 0) {
-            pluginsList.innerHTML = data.plugins.map(plugin => `
+            pluginsList.innerHTML = data.plugins.map(plugin => {
+                const isStandalone = plugin.name.startsWith('standalone-');
+                const displayName = isStandalone ? plugin.name.replace('standalone-', '') : plugin.name;
+                return `
                 <div style="padding:16px;background:var(--bg-input);border-radius:8px;border:1px solid var(--border);">
-                    <h3 style="margin:0 0 8px;">${plugin.name} v${plugin.version}</h3>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                        <h3 style="margin:0;">${displayName}</h3>
+                        ${isStandalone ? `<span style="padding:2px 8px;background:rgba(16,185,129,.2);color:#10b981;border-radius:4px;font-size:.7rem;font-weight:600;">STANDALONE</span>` : ''}
+                        <span style="color:var(--text-dim);font-size:.85rem;">v${plugin.version}</span>
+                    </div>
                     <p style="color:var(--text-dim);margin:0 0 12px;font-size:.9rem;">${plugin.description || 'No description'}</p>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
                         ${plugin.commands.length > 0 ? `<span style="padding:4px 8px;background:rgba(99,102,241,.15);border-radius:4px;font-size:.8rem;">${plugin.commands.length} commands</span>` : ''}
                         ${plugin.agents.length > 0 ? `<span style="padding:4px 8px;background:rgba(16,185,129,.15);border-radius:4px;font-size:.8rem;">${plugin.agents.length} agents</span>` : ''}
-                        ${plugin.skills.length > 0 ? `<span style="padding:4px 8px;background:rgba(245,158,11,.15);border-radius:4px;font-size:.8rem;">${plugin.skills.length} skills</span>` : ''}
+                        ${plugin.skills.length > 0 ? `<span style="padding:4px 8px;background:rgba(245,158,11,.15);border-radius:4px;font-size:.8rem;">⭐ ${plugin.skills.length} skill${plugin.skills.length > 1 ? 's' : ''}</span>` : ''}
                     </div>
-                    ${plugin.skills.length > 0 ? `<button onclick="loadPluginSkills('${plugin.name}')" class="btn btn-primary" style="margin-top:12px;width:auto;">View Skills</button>` : ''}
+                    ${plugin.skills.length > 0 ? `<button onclick="loadPluginSkills('${plugin.name}')" class="btn btn-primary" style="margin-top:12px;width:auto;">View Skills →</button>` : ''}
                 </div>
-            `).join('');
+            `;
+            }).join('');
         } else {
             pluginsList.innerHTML = '<p style="color:var(--text-dim);">No plugins loaded. Import one to get started!</p>';
         }

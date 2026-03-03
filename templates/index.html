@@ -532,7 +532,17 @@
                 </div>
 
                 <div class="card">
-                    <h2>Loaded Plugins</h2>
+                    <h2>Loaded Plugins & Skills</h2>
+                    <div class="mfa-info" style="margin-bottom:16px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);">
+                        <strong>How to use imported skills:</strong>
+                        <ol style="margin:8px 0 0 20px;padding-left:0;">
+                            <li>Find your imported skill in the list below</li>
+                            <li>Click <strong>"View Skills"</strong> button</li>
+                            <li>Click <strong>"Execute"</strong> on the skill you want to use</li>
+                            <li>Enter your input and click <strong>"Execute Skill"</strong></li>
+                            <li><strong>Note:</strong> You need an OpenAI API key configured (see Stories tab)</li>
+                        </ol>
+                    </div>
                     <button type="button" class="btn btn-ghost" id="refreshPluginsBtn" style="margin-bottom:16px;">Refresh List</button>
                     <div id="pluginsList" style="display:grid;gap:12px;">
                         <p style="color:var(--text-dim);">Loading plugins...</p>
