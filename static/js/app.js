@@ -1543,8 +1543,11 @@ document.getElementById('executeSkillForm')?.addEventListener('submit', async (e
             resultDiv.innerHTML = `<h3>Skill Execution Result</h3><div class="story-text">${String(data.result).replace(/\n/g, '<br>')}</div>`;
         } else {
             resultDiv.className = 'story-result error';
-            resultDiv.innerHTML = `Error: ${data.error || 'Failed to execute skill'}`;
+            resultDiv.innerHTML = `<h3>Error</h3><div class="story-text">${data.error || 'Failed to execute skill'}</div>`;
         }
+        
+        // Scroll to results so user can see them
+        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (error) {
         resultDiv.style.display = 'block';
         resultDiv.className = 'story-result error';
